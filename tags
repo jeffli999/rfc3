@@ -1,0 +1,123 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+BIGINT	stdinc.h	/^const int BIGINT = 0x7fffffff;$/;"	v
+EOS	stdinc.h	/^const int EOS = '\\0';$/;"	v
+FILTERSIZE	rfc.h	5;"	d
+MAXCHUNKS	rfc.h	3;"	d
+MAXDIMENSIONS	rfc.h	2;"	d
+MAXRULES	rfc.h	1;"	d
+MAXTABLE	rfc.h	4;"	d
+N	dheap.h	/^	int	N;			\/\/ max number of items in heap$/;"	m	class:dheap
+Null	stdinc.h	/^const int Null = -1;$/;"	v
+TAB16K	rfc.h	7;"	d
+abs	stdinc.h	/^inline int abs(int x) { return x < 0 ? -x : x; }$/;"	f
+bit	stdinc.h	/^typedef char bit;$/;"	t
+cbm_entry	rfc.h	/^typedef struct cbm_entry {$/;"	s
+cbm_entry_t	rfc.h	/^} cbm_entry_t;$/;"	t	typeref:struct:cbm_entry
+cbm_lookup	rfc3.c	/^int cbm_lookup(int *cbm_rules, int num_cbm_rules, cbm_entry_t *cbm_list, int num_cbm)$/;"	f
+changekey	dheap.c	/^void dheap::changekey(item i, keytyp k) {$/;"	f	class:dheap
+chunk_to_field	rfc3.c	/^const int chunk_to_field[MAXCHUNKS] = {0, 0, 1, 1, 2, 3, 4};$/;"	v
+crossprod_2chunk	rfc3.c	/^int crossprod_2chunk(cbm_entry_t *c1, int num1, cbm_entry_t *c2, int num2, cbm_entry_t *cpd)$/;"	f
+d	dheap.h	/^	int	d;			\/\/ base of heap$/;"	m	class:dheap
+deletemin	dheap.c	/^int dheap::deletemin() {$/;"	f	class:dheap
+dheap	dheap.c	/^dheap::dheap(int N1, int d1) {$/;"	f	class:dheap
+dheap	dheap.h	/^class dheap {$/;"	c
+dump_endpoints	rfc3.c	/^int dump_endpoints()$/;"	f
+dump_p0_table	rfc3.c	/^void dump_p0_table(int chunk)$/;"	f
+empty	dheap.h	/^inline bit dheap::empty() { return n == 0; };$/;"	f	class:dheap
+epoints	rfc3.c	/^int epoints[MAXCHUNKS][MAXRULES*2+2];$/;"	v
+eq_entry	rfc.h	/^typedef struct eq_entry {$/;"	s
+eq_entry_t	rfc.h	/^} eq_entry_t;$/;"	t	typeref:struct:eq_entry
+eq_id	rfc.h	/^    int	eq_id;$/;"	m	struct:eq_entry
+fatal	stdinc.h	/^inline void fatal(char* string) {fprintf(stderr,"Fatal:%s\\n",string); exit(1); }$/;"	f
+field	rfc.h	/^  struct range field[MAXDIMENSIONS];$/;"	m	struct:pc_rule	typeref:struct:pc_rule::range
+findmin	dheap.h	/^inline int dheap::findmin() { return n == 0 ? Null : h[1]; }$/;"	f	class:dheap
+fpr	rfc.c	/^FILE *fpr;       \/\/ ruleset file$/;"	v
+fpr	rfc3.c	/^FILE *fpr;       \/\/ ruleset file$/;"	v
+fpt	rfc.c	/^FILE *fpt;       \/\/ test trace file$/;"	v
+fpt	rfc3.c	/^FILE *fpt;       \/\/ test trace file$/;"	v
+gen_endpoints	rfc3.c	/^int gen_endpoints()$/;"	f
+gen_p0_cbm	rfc3.c	/^int gen_p0_cbm(int chunk)$/;"	f
+gen_p0_tables	rfc3.c	/^int gen_p0_tables()$/;"	f
+h	dheap.h	/^	item	*h;			\/\/ {h[1],...,h[n]} is set of items$/;"	m	class:dheap
+high	rfc.h	/^  unsigned high;$/;"	m	struct:range
+insert	dheap.c	/^void dheap::insert(item i, keytyp k) {$/;"	f	class:dheap
+item	dheap.h	/^typedef int item;$/;"	t
+key	dheap.h	/^inline keytyp dheap::key(item i) { return kvec[i]; }$/;"	f	class:dheap
+keytyp	dheap.h	/^typedef unsigned long keytyp;$/;"	t
+kvec	dheap.h	/^	keytyp	*kvec;			\/\/ kvec[i] is key of item i$/;"	m	class:dheap
+left	dheap.c	6;"	d	file:
+loadrule	rfc.c	/^int loadrule(FILE *fp, pc_rule *rule){$/;"	f
+loadrule	rfc3.c	/^int loadrule(FILE *fp, pc_rule *rule){$/;"	f
+low	rfc.h	/^  unsigned low;$/;"	m	struct:range
+main	rfc.c	/^int main(int argc, char* argv[]){$/;"	f
+main	rfc3.c	/^int main(int argc, char* argv[]){$/;"	f
+max	stdinc.h	/^inline double max(double x, double y) { return x > y ? x : y; }$/;"	f
+max	stdinc.h	/^inline int max(int x, int y) { return x > y ? x : y; }$/;"	f
+max	stdinc.h	/^inline unsigned max(unsigned x, unsigned y) { return x > y ? x : y; }$/;"	f
+member	dheap.h	/^inline bit dheap::member(item i) { return pos[i] != Null; }$/;"	f	class:dheap
+min	stdinc.h	/^inline double min(double x, double y) { return x < y ? x : y; }$/;"	f
+min	stdinc.h	/^inline int min(int x, int y) { return x < y ? x : y; }$/;"	f
+min	stdinc.h	/^inline unsigned min(unsigned x, unsigned y) { return x < y ? x : y; }$/;"	f
+minchild	dheap.c	/^int dheap::minchild(int x) {$/;"	f	class:dheap
+n	dheap.h	/^	int	n;			\/\/ number of items in heap$/;"	m	class:dheap
+num_epoints	rfc3.c	/^int num_epoints[MAXCHUNKS];$/;"	v
+numrules	rfc.h	/^  int numrules;$/;"	m	struct:cbm_entry
+numrules	rfc3.c	/^int numrules=0;  \/\/ actual number of rules in rule set$/;"	v
+p	dheap.c	5;"	d	file:
+p0_cbm	rfc3.c	/^cbm_entry_t *p0_cbm[7];		\/\/phase 0 chunk equivalence class$/;"	v
+p0_cbm_num	rfc3.c	/^int p0_cbm_num[7];		\/\/phase 0 number of chunk equivalence classes$/;"	v
+p0_eq	rfc.c	/^struct eq p0_eq[7][2*MAXRULES];          \/\/phase 0 chunk equivalence class$/;"	v	typeref:struct:eq
+p0_neq	rfc.c	/^int p0_neq[7];                           \/\/phase 0 number of chunk equivalence classes$/;"	v
+p0_table	rfc.c	/^int p0_table[7][65536];                  \/\/phase 0 chunk tables$/;"	v
+p0_table	rfc3.c	/^int p0_table[7][65536];		\/\/phase 0 chunk tables$/;"	v
+p1_cbm	rfc3.c	/^cbm_entry_t *p1_cbm[4];		\/\/phase 1 chunk equivalence class$/;"	v
+p1_cbm_num	rfc3.c	/^int p1_cbm_num[4];              \/\/phase 1 number of chunk equivalence classes$/;"	v
+p1_eq	rfc.c	/^struct eq p1_eq[4][2*MAXRULES];          \/\/phase 1 chunk equivalence class$/;"	v	typeref:struct:eq
+p1_neq	rfc.c	/^int p1_neq[4];                           \/\/phase 1 number of chunk equivalence classes$/;"	v
+p1_table	rfc.c	/^int p1_table[4][MAXTABLE];               \/\/phase 1 chunk tables$/;"	v
+p1_table	rfc3.c	/^int p1_table[4][MAXTABLE];	\/\/phase 1 chunk tables$/;"	v
+p2_cbm	rfc3.c	/^cbm_entry_t *p2_cbm[2];		\/\/phase 2 chunk equivalence class$/;"	v
+p2_cbm_num	rfc3.c	/^int p2_cbm_num[2];              \/\/phase 2 number of chunk equivalence classes$/;"	v
+p2_eq	rfc.c	/^struct eq p2_eq[2][2*MAXRULES];          \/\/phase 2 chunk equivalence class$/;"	v	typeref:struct:eq
+p2_neq	rfc.c	/^int p2_neq[2];                           \/\/phase 2 number of chunk equivalence classes$/;"	v
+p2_table	rfc.c	/^int p2_table[2][MAXTABLE];               \/\/phase 2 chunk tables$/;"	v
+p2_table	rfc3.c	/^int p2_table[2][MAXTABLE];      \/\/phase 2 chunk tables$/;"	v
+p3_cbm	rfc3.c	/^cbm_entry_t *p3_cbm;		\/\/phase 3 chunk equivalence class$/;"	v
+p3_cbm_num	rfc3.c	/^int p3_cbm_num;                 \/\/phase 3 number of chunk equivalence classes$/;"	v
+p3_eq	rfc.c	/^struct eq p3_eq[2*MAXRULES];             \/\/phase 3 chunk equivalence class$/;"	v	typeref:struct:eq
+p3_neq	rfc.c	/^int p3_neq;                              \/\/phase 3 number of chunk equivalence classes$/;"	v
+p3_table	rfc.c	/^int p3_table[MAXTABLE];                  \/\/phase 3 chunk tables$/;"	v
+p3_table	rfc3.c	/^int p3_table[MAXTABLE];         \/\/phase 3 chunk tables$/;"	v
+parseargs	rfc.c	/^void parseargs(int argc, char *argv[]) {$/;"	f
+parseargs	rfc3.c	/^void parseargs(int argc, char *argv[]) $/;"	f
+pc_rule	rfc.h	/^typedef struct pc_rule{$/;"	s
+pc_rule_t	rfc.h	/^} pc_rule_t;$/;"	t	typeref:struct:pc_rule
+phase	rfc.c	/^int  phase = 4;  \/\/ number of pahses$/;"	v
+phase	rfc3.c	/^int  phase = 4;  \/\/ number of pahses$/;"	v
+point_cmp	rfc3.c	/^static int point_cmp(const void *p, const void *q)$/;"	f	file:
+pos	dheap.h	/^	int	*pos;			\/\/ pos[i] gives position of i in h$/;"	m	class:dheap
+preprocessing_2chunk	rfc.c	/^int preprocessing_2chunk(eq *a, int na, eq *b, int nb, eq *x, int *tb){$/;"	f
+preprocessing_3chunk	rfc.c	/^int preprocessing_3chunk(eq *a, int na, eq *b, int nb, eq *c, int nc, eq *x, int *tb){$/;"	f
+preprocessing_phase0	rfc.c	/^int preprocessing_phase0(int chunk_id, pc_rule *rule, int numrules) {$/;"	f
+print	dheap.c	/^void dheap::print() {$/;"	f	class:dheap
+randexp	stdinc.h	/^inline double randexp(double mu) { return -mu*log(randfrac()); }$/;"	f
+randfrac	stdinc.h	/^inline double randfrac() { return ((double) random())\/BIGINT; }$/;"	f
+randgeo	stdinc.h	/^inline int randgeo(double p) { return int(.999999 + log(randfrac())\/log(1-p)); }$/;"	f
+randint	stdinc.h	/^inline int randint(int lo, int hi) { return lo + (random() % (hi + 1 - lo)); }$/;"	f
+randpar	stdinc.h	/^inline double randpar(double mu, double s) {$/;"	f
+range	rfc.h	/^struct range{$/;"	s
+remove	dheap.c	/^void dheap::remove(item i) {$/;"	f	class:dheap
+right	dheap.c	7;"	d	file:
+rulelist	rfc.h	/^  int *rulelist;$/;"	m	struct:cbm_entry
+rules	rfc3.c	/^struct pc_rule *rules; $/;"	v	typeref:struct:pc_rule
+shamt	rfc3.c	/^const int shamt[MAXCHUNKS] = {0, 16, 0, 16, 0, 0, 0};$/;"	v
+siftdown	dheap.c	/^void dheap::siftdown(item i, int x) {$/;"	f	class:dheap
+siftup	dheap.c	/^void dheap::siftup(item i, int x) {$/;"	f	class:dheap
+sort_endpoints	rfc3.c	/^int sort_endpoints()$/;"	f
+warning	stdinc.h	/^inline void warning(char* p) { fprintf(stderr,"Warning:%s \\n",p); }$/;"	f
+~dheap	dheap.c	/^dheap::~dheap() { delete [] h; delete [] pos; delete [] kvec; }$/;"	f	class:dheap
