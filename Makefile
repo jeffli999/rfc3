@@ -1,8 +1,8 @@
-CPP = g++
+CPP = gcc
 CFLAGS = -g
 
-rfc: rfc3.c
-	${CPP} ${CFLAGS} -o rfc rfc3.c
+rfc: rfc.c
+	${CPP} ${CFLAGS} -o rfc rfc.c
 
 all: rfc 
 
