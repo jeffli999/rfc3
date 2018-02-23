@@ -44,11 +44,41 @@ int	p1_cbm_num[4];          //phase 1 number of chunk equivalence classes
 int	p2_cbm_num[2];          //phase 2 number of chunk equivalence classes
 int	p3_cbm_num;		//phase 3 number of chunk equivalence classes
 
-
 int	rulelist_len_count[64];
-int	*cbm_groups[64];	//cbms grouped in their rulelist lengths
-int	cbm_group_size[64];	//size of each group to accommodate cbms
-int	cbm_group_num[64];	//current number of cbms in each group
+
+// cbm_lookup() works slow when there is a large number of CBMs,
+// To speed up, we can limit its search to CBMs with the same rulesum
+// A hash table hashing on CBM's rulesum is introduced for this purpose
+#define HASH_TAB_SIZE   9209
+int     *cbm_hash[HASH_TAB_SIZE];
+int     cbm_hash_size[HASH_TAB_SIZE];   
+int     cbm_hash_num[HASH_TAB_SIZE];    
+
+
+
+void init_cbm_hash()
+{
+    int	i;
+
+    for (i = 0; i < HASH_TAB_SIZE; i++) {
+        cbm_hash[i] = (int *) malloc(4*sizeof(int));
+        cbm_hash_size[i] = 4;
+        cbm_hash_num[i] = 0;
+    }
+}
+
+
+
+void free_cbm_hash()
+{
+    int i;
+
+    for (i = 0; i < HASH_TAB_SIZE; i++)
+        free(cbm_hash[i]);
+}
+
+
+
 
 int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int cbm_num, int flag);
 
