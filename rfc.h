@@ -19,6 +19,7 @@ typedef struct pc_rule{
 typedef struct cbm_entry {
   int numrules;
   int *rulelist;
+  int rulesum;
 } cbm_t;
 
 typedef struct eq_entry {
