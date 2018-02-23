@@ -1,11 +1,6 @@
 #define MAXRULES	65536
 #define MAXDIMENSIONS	5
 #define MAXCHUNKS	7
-#define MAXTABLE	5000000
-#define MAXCBM		1000000
-#define FILTERSIZE 18
-
-#define TAB16K 65536
 
 struct range{
   unsigned low;

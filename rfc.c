@@ -27,9 +27,9 @@ int	epoints[MAXCHUNKS][MAXRULES*2+2];
 int	num_epoints[MAXCHUNKS];
 
 int	p0_table[7][65536];	//phase 0 chunk tables
-int	p1_table[4][MAXTABLE];	//phase 1 chunk tables
-int	p2_table[2][MAXTABLE];  //phase 2 chunk tables
-int	p3_table[MAXTABLE];     //phase 3 chunk tables
+int	*p1_table[4];		//phase 1 chunk tables
+int	*p2_table[2];  		//phase 2 chunk tables
+int	*p3_table;     		//phase 3 chunk tables
 int	p1_table_size[4];	//size of the phase 1 tables
 int	p2_table_size[2];	//size of the phase 2 tables
 int	p3_table_size;		//size of the phase 3 tables
@@ -560,6 +560,7 @@ int p1_crossprod()
     // SIP[31:16] x SIP[15:0]
     table_size = p0_cbm_num[1] * p0_cbm_num[0];
     p1_table_size[0] = table_size;
+    p1_table[0] = (int *) malloc(table_size*sizeof(int));
     p1_cbm[0] = crossprod_2chunk(p0_cbm[1], p0_cbm_num[1], p0_cbm[0], p0_cbm_num[0], &p1_cbm_num[0], p1_table[0]);
     printf("chunk[%d] has %d/%d cbm\n", 0, p1_cbm_num[0], table_size);
     dump_phase_table(p1_table[0], table_size, RUNLEN);
@@ -568,6 +569,7 @@ int p1_crossprod()
     // DIP[31:16] x DIP[15:0]
     table_size = p0_cbm_num[3] * p0_cbm_num[2];
     p1_table_size[1] = table_size;
+    p1_table[1] = (int *) malloc(table_size*sizeof(int));
     p1_cbm[1] = crossprod_2chunk(p0_cbm[3], p0_cbm_num[3], p0_cbm[2], p0_cbm_num[2], &p1_cbm_num[1], p1_table[1]);
     printf("chunk[%d] has %d/%d cbm\n", 1, p1_cbm_num[1], table_size);
     dump_phase_table(p1_table[1], table_size, RUNLEN);
@@ -576,6 +578,7 @@ int p1_crossprod()
     // DP x SP
     table_size = p0_cbm_num[6] * p0_cbm_num[5];
     p1_table_size[2] = table_size;
+    p1_table[2] = (int *) malloc(table_size*sizeof(int));
     p1_cbm[2] = crossprod_2chunk(p0_cbm[6], p0_cbm_num[6], p0_cbm[5], p0_cbm_num[5], &p1_cbm_num[2], p1_table[2]);
     printf("chunk[%d] has %d/%d cbm\n", 2, p1_cbm_num[2], table_size);
     dump_phase_table(p1_table[2], table_size, RUNLEN);
@@ -591,6 +594,7 @@ int p2_crossprod()
     // SIP x DIP
     table_size = p1_cbm_num[0] * p1_cbm_num[1];
     p2_table_size[0] = table_size;
+    p2_table[0] = (int *) malloc(table_size*sizeof(int));
     p2_cbm[0] = crossprod_2chunk(p1_cbm[0], p1_cbm_num[0], p1_cbm[1], p1_cbm_num[1], &p2_cbm_num[0], p2_table[0]);
     printf("chunk[%d] has %d/%d cbm\n", 0, p2_cbm_num[0], table_size);
     dump_phase_table(p2_table[0], table_size, RUNLEN);
@@ -599,6 +603,7 @@ int p2_crossprod()
     // PROTO x (DP x SP)
     table_size = p0_cbm_num[4] * p1_cbm_num[2];
     p2_table_size[1] = table_size;
+    p2_table[1] = (int *) malloc(table_size*sizeof(int));
     p2_cbm[1] = crossprod_2chunk(p0_cbm[4], p0_cbm_num[4], p1_cbm[2], p1_cbm_num[2], &p2_cbm_num[1], p2_table[1]);
     printf("chunk[%d] has %d/%d cbm\n", 1, p2_cbm_num[1], table_size);
     dump_phase_table(p2_table[1], table_size, RUNLEN);
@@ -614,6 +619,7 @@ int p3_crossprod()
     // (SIP x DIP) x (PROTO x (DP x SP))
     table_size = p2_cbm_num[0] * p2_cbm_num[1];
     p3_table_size = table_size;
+    p3_table = (int *) malloc(table_size*sizeof(int));
     p3_cbm = crossprod_2chunk(p2_cbm[0], p2_cbm_num[0], p2_cbm[1], p2_cbm_num[1], &p3_cbm_num, p3_table);
     printf("chunk[%d] has %d/%d cbm\n", 0, p3_cbm_num, table_size);
     dump_phase_table(p3_table, table_size, RUNLEN);
