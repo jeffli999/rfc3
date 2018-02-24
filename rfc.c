@@ -49,11 +49,40 @@ int	rulelist_len_count[64];
 // cbm_lookup() works slow when there is a large number of CBMs,
 // To speed up, we can limit its search to CBMs with the same rulesum
 // A hash table hashing on CBM's rulesum is introduced for this purpose
-#define HASH_TAB_SIZE   9209
+//#define HASH_TAB_SIZE   9209
+#define HASH_TAB_SIZE   29123
 int     *cbm_hash[HASH_TAB_SIZE];
 int     cbm_hash_size[HASH_TAB_SIZE];   
 int     cbm_hash_num[HASH_TAB_SIZE];    
 
+int	hash_stats[10000];
+int	intersect_stats[MAXRULES*2];
+
+
+void dump_intersect_stats()
+{
+    int	    i;
+
+    for (i = 0; i < MAXRULES*2; i++) {
+	if (intersect_stats[i] > 0)
+	    printf("intersect[%5d]: %7d / %9d\n", i, intersect_stats[i], intersect_stats[i]*i);
+    }
+}
+
+
+void dump_hash_stats()
+{
+    int	    i, total = 0;
+
+    printf("Statistics on cbm hash lookups\n================================\n");
+    for (i = 0; i < 10000; i++) {
+	if (hash_stats[i] > 0) {
+	    total += hash_stats[i] * i;
+	    printf("cbm_lookup[%4d]: %7d / %8d\n", i, hash_stats[i], hash_stats[i]*i);
+	}
+    }
+    printf("Total cbm hash lookups: %d\n", total);
+}
 
 
 void init_cbm_hash()
@@ -61,12 +90,11 @@ void init_cbm_hash()
     int	i;
 
     for (i = 0; i < HASH_TAB_SIZE; i++) {
-        cbm_hash[i] = (int *) malloc(4*sizeof(int));
-        cbm_hash_size[i] = 4;
+        cbm_hash[i] = (int *) malloc(2*sizeof(int));
+        cbm_hash_size[i] = 2;
         cbm_hash_num[i] = 0;
     }
 }
-
 
 
 void free_cbm_hash()
@@ -78,10 +106,7 @@ void free_cbm_hash()
 }
 
 
-
-
 int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int cbm_num, int flag);
-
 
 
 int dump_rulelist_len_count()
@@ -89,9 +114,8 @@ int dump_rulelist_len_count()
     int	    i;
 
     printf("======================\n");
-    for (i = 0; i < 64; i++) {
+    for (i = 0; i < 64; i++)
 	printf("rulelist[%d]: %d\n", i,  rulelist_len_count[i]);
-    }
 }
 
 
@@ -135,7 +159,6 @@ void parseargs(int argc, char *argv[])
 }
 
 
-
 int loadrule(FILE *fp, pc_rule_t *rule){
 
     int tmp;
@@ -145,7 +168,6 @@ int loadrule(FILE *fp, pc_rule_t *rule){
     int i = 0;
 
     while(1) {
-
 	if(fscanf(fp,"@%d.%d.%d.%d/%d %d.%d.%d.%d/%d %d : %d %d : %d %x/%x\n", 
 		    &sip1, &sip2, &sip3, &sip4, &siplen, &dip1, &dip2, &dip3, &dip4, &diplen, 
 		    &rules[i].field[3].low, &rules[i].field[3].high, &rules[i].field[4].low, &rules[i].field[4].high,
@@ -215,12 +237,10 @@ int loadrule(FILE *fp, pc_rule_t *rule){
 }
 
 
-
 static int point_cmp(const void *p, const void *q)
 {
     return *(int *)p - *(int *)q;
 }
-
 
 
 int dump_endpoints()
@@ -237,7 +257,6 @@ int dump_endpoints()
 }
 
 
-
 int sort_endpoints()
 {
     int	    chunk, i;
@@ -251,7 +270,6 @@ int sort_endpoints()
 	}
     }
 }
-
 
 
 const int chunk_to_field[MAXCHUNKS] = {0, 0, 1, 1, 2, 3, 4};
@@ -278,7 +296,6 @@ int gen_endpoints()
 }
 
 
-
 int compare_rules(int *rules1, int *rules2, int n)
 {
     int	    i;
@@ -291,63 +308,23 @@ int compare_rules(int *rules1, int *rules2, int n)
 }
 
 
-
 int cbm_lookup(int *cbm_rules, int num_cbm_rules, int rulesum, cbm_t *cbm_set)
 {
-    int	    i, id, match = 0;
+    int	    h, i, n, id, match = 0;
 
-    if (num_cbm_rules == 0) {
-	if (cbm_group_num[0] > 0) {
-	    return cbm_groups[0][0];
-	} else
-	    return -1;
-    } else if (num_cbm_rules == 1) {
-	for (i = 0; i < cbm_group_num[1]; i++) {
-	    id = cbm_groups[1][i];
-	    if (cbm_rules[0] == cbm_set[id].rulelist[0])
-		return id;
+    h = rulesum % HASH_TAB_SIZE;
+    for (i = 0; i < cbm_hash_num[h]; i++) {
+	id = cbm_hash[h][i];
+	if (cbm_set[id].numrules != num_cbm_rules)
+	    continue;
+	if (memcmp(cbm_rules, cbm_set[id].rulelist, num_cbm_rules*sizeof(int)) == 0) {
+	    hash_stats[i+1]++;
+	    return id;
 	}
-	return -1;
-    } else if (num_cbm_rules == 2) {
-	for (i = 0; i < cbm_group_num[2]; i++) {
-	    id = cbm_groups[2][i];
-	    if ((cbm_rules[0] == cbm_set[id].rulelist[0]) && (cbm_rules[1] == cbm_set[id].rulelist[1]))
-		return id;
-	}
-	return -1;
-    } else if (num_cbm_rules < 63) {
-	for (i = 0; i < cbm_group_num[num_cbm_rules]; i++) {
-	    id = cbm_groups[num_cbm_rules][i];
-	    if (cbm_set[id].rulesum != rulesum)
-		continue;
-	    if (memcmp(cbm_rules, cbm_set[id].rulelist, num_cbm_rules*sizeof(int)) == 0)
-		return id;
-	    /*
-	    match = compare_rules(cbm_rules, cbm_set[id].rulelist, num_cbm_rules);
-	    if (match)
-		return id;
-	    */
-	}
-	return -1;
-    } else {
-	for (i = 0; i < cbm_group_num[63]; i++) {
-	    id = cbm_groups[63][i];
-	    if (cbm_set[id].numrules != num_cbm_rules)
-		continue;
-	    if (cbm_set[id].rulesum != rulesum)
-		continue;
-	    if (memcmp(cbm_rules, cbm_set[id].rulelist, num_cbm_rules*sizeof(int)) == 0)
-		return id;
-	    /*
-	    match = compare_rules(cbm_rules, cbm_set[id].rulelist, num_cbm_rules);
-	    if (match)
-		return id;
-	    */
-	}
-	return -1;
     }
+    hash_stats[i]++;
+    return -1;
 }
-
 
 
 // print the phase table with run length of eqid in the table >= thresh_rl
@@ -373,6 +350,18 @@ void dump_phase_table(int *table, int len, int thresh_rlen)
 }
 
 
+void add_to_hash(cbm_t *cbm)
+{
+    int	    h;
+
+    h = cbm->rulesum % HASH_TAB_SIZE;
+    cbm_hash[h][cbm_hash_num[h]] = cbm->id;
+    if (++cbm_hash_num[h] == cbm_hash_size[h]) {
+	cbm_hash_size[h] <<= 1;
+	cbm_hash[h] = (int *) realloc(cbm_hash[h], cbm_hash_size[h]*sizeof(int));
+    }
+}
+
 
 int gen_p0_cbm(int chunk)
 {
@@ -382,12 +371,7 @@ int gen_p0_cbm(int chunk)
     f = chunk_to_field[chunk];
     k = shamt[chunk];
     p0_cbm[chunk] = (cbm_t *) malloc(cbm_set_size * sizeof(cbm_t));
-
-    for (i = 0; i < 64; i++) {
-	cbm_groups[i] = (int *) malloc(64*sizeof(int));
-	cbm_group_size[i] = 64;
-	cbm_group_num[i]  = 0;
-    }
+    init_cbm_hash();
 
     for (i = 0; i < num_epoints[chunk]; i++) {
 	// 1. generate a cbm
@@ -408,22 +392,19 @@ int gen_p0_cbm(int chunk)
 	if (cbm_id <  0) {
 	    // 3. this is a new cbm, add it to the cbm_set
 	    cbm_id = num_cbm;
-	    p0_cbm[chunk][num_cbm].numrules = num_cbm_rules;
-	    p0_cbm[chunk][num_cbm].rulelist = (int *) malloc(num_cbm_rules * sizeof(int));
-	    p0_cbm[chunk][num_cbm].rulesum = rulesum;
-	    memcpy(p0_cbm[chunk][num_cbm].rulelist, cbm_rules, num_cbm_rules * sizeof(int));
+	    p0_cbm[chunk][cbm_id].id = cbm_id;
+	    p0_cbm[chunk][cbm_id].numrules = num_cbm_rules;
+	    p0_cbm[chunk][cbm_id].rulelist = (int *) malloc(num_cbm_rules * sizeof(int));
+	    p0_cbm[chunk][cbm_id].rulesum = rulesum;
+	    memcpy(p0_cbm[chunk][cbm_id].rulelist, cbm_rules, num_cbm_rules * sizeof(int));
 	    if (++num_cbm == cbm_set_size) {
 		cbm_set_size += 64;
 		p0_cbm[chunk] = realloc(p0_cbm[chunk], cbm_set_size*sizeof(cbm_t));
 	    }
 
 	    // record rulelists in different lengths, s.t. to speed up cbm_lookup()
+	    add_to_hash(&p0_cbm[chunk][cbm_id]);
 	    len = num_cbm_rules > 63 ? 63 : num_cbm_rules;
-	    cbm_groups[len][cbm_group_num[len]] = cbm_id;
-	    if (++cbm_group_num[len] == cbm_group_size[len]) {
-		cbm_group_size[len] = cbm_group_size[len] << 1;
-		cbm_groups[len] = (int *) realloc(cbm_groups[len], cbm_group_size[len]*sizeof(int));
-	    }
 	    rulelist_len_count[len]++;
 	}
 
@@ -432,16 +413,11 @@ int gen_p0_cbm(int chunk)
 	for (j = point; j < next_point; j++)
 	    p0_table[chunk][j] = cbm_id;
     }
-
-    for (i = 0; i < 64; i++)
-	free(cbm_groups[i]);
-
+    free_cbm_hash();
     printf("chunk[%d] has %d cbm\n", chunk, num_cbm);
     //dump_phase_table(p0_table[chunk], 65536);
-
     return num_cbm;
 }
-
 
 
 int gen_p0_tables()
@@ -452,14 +428,14 @@ int gen_p0_tables()
 	p0_cbm_num[chunk] = gen_p0_cbm(chunk);
 	do_cbm_stats(p0_table[chunk], 65536, p0_cbm[chunk], p0_cbm_num[chunk], 0);
     }
-    
+    dump_intersect_stats();
+    bzero(intersect_stats, MAXRULES*2*sizeof(int));
 }
-
 
 
 int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *cbm_rules, int *rulesum)
 {
-    int	    i = 0, j = 0, n = 0;
+    int	    i = 0, j = 0, n = 0, ncmp = 0;
 
     *rulesum = 0;
     while (i < c1->numrules && j < c2->numrules) {
@@ -472,10 +448,11 @@ int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *cbm_rules, int *rulesum)
 	} else {
 	    i++;
 	}
+	ncmp++;
     }
+    intersect_stats[ncmp]++;
     return n;
 }
-
 
 
 cbm_t* crossprod_2chunk(cbm_t *cbm_set1, int n1, cbm_t *cbm_set2, int n2, int *num_cpd, int *cpd_tab)
@@ -485,12 +462,7 @@ cbm_t* crossprod_2chunk(cbm_t *cbm_set1, int n1, cbm_t *cbm_set2, int n2, int *n
     cbm_t   *cpd_set;
     
     cpd_set = (cbm_t *) malloc(cpd_set_size*sizeof(cbm_t));
-
-    for (i = 0; i < 64; i++) {
-	cbm_groups[i] = (int *) malloc(64*sizeof(int));
-	cbm_group_size[i] = 64;
-	cbm_group_num[i]  = 0;
-    }
+    init_cbm_hash();
 
     for (i = 0; i < n1; i++) {
 
@@ -507,22 +479,18 @@ cbm_t* crossprod_2chunk(cbm_t *cbm_set1, int n1, cbm_t *cbm_set2, int n2, int *n
 	    if (cbm_id < 0) {
 		// 3. the intersect cbm is new, so add it to the crossproducted cbm list
 		cbm_id = n;
-		cpd_set[n].numrules = num_cbm_rules;
-		cpd_set[n].rulelist = (int *) malloc(num_cbm_rules * sizeof(int));
-		cpd_set[n].rulesum = rulesum;
-		memcpy(cpd_set[n].rulelist, cbm_rules, num_cbm_rules * sizeof(int));
+		cpd_set[cbm_id].id = cbm_id;
+		cpd_set[cbm_id].numrules = num_cbm_rules;
+		cpd_set[cbm_id].rulelist = (int *) malloc(num_cbm_rules * sizeof(int));
+		cpd_set[cbm_id].rulesum = rulesum;
+		memcpy(cpd_set[cbm_id].rulelist, cbm_rules, num_cbm_rules * sizeof(int));
 		if (++n == cpd_set_size) {
 		    cpd_set_size += MAXRULES;
 		    cpd_set = realloc(cpd_set, cpd_set_size*sizeof(cbm_t));
 		}
 
-		// record rulelists in different lengths, s.t. to speed up cbm_lookup()
+		add_to_hash(&cpd_set[cbm_id]);
 		len = num_cbm_rules > 63 ? 63 : num_cbm_rules;
-		cbm_groups[len][cbm_group_num[len]] = cbm_id;
-		if (++cbm_group_num[len] == cbm_group_size[len]) {
-		    cbm_group_size[len] = cbm_group_size[len] << 1;
-		    cbm_groups[len] = (int *) realloc(cbm_groups[len], cbm_group_size[len]*sizeof(int));
-		}
 		rulelist_len_count[len]++;
 	    }
 	    //4. fill the corresponding crossproduct table with the eqid (cmb_id)
@@ -530,9 +498,7 @@ cbm_t* crossprod_2chunk(cbm_t *cbm_set1, int n1, cbm_t *cbm_set2, int n2, int *n
 	}
     }
 
-    for (i = 0; i < 64; i++)
-	free(cbm_groups[i]);
-
+    free_cbm_hash();
     *num_cpd = n;
     return cpd_set;
 }
@@ -613,6 +579,9 @@ int p1_crossprod()
     printf("chunk[%d] has %d/%d cbm\n", 2, p1_cbm_num[2], table_size);
     dump_phase_table(p1_table[2], table_size, RUNLEN);
     do_cbm_stats(p1_table[2], table_size, p1_cbm[2], p1_cbm_num[2], 0);
+
+    dump_intersect_stats();
+    bzero(intersect_stats, MAXRULES*2*sizeof(int));
 }
 
 
@@ -638,6 +607,9 @@ int p2_crossprod()
     printf("chunk[%d] has %d/%d cbm\n", 1, p2_cbm_num[1], table_size);
     dump_phase_table(p2_table[1], table_size, RUNLEN);
     do_cbm_stats(p2_table[1], table_size, p2_cbm[1], p2_cbm_num[1], 0);
+
+    dump_intersect_stats();
+    bzero(intersect_stats, MAXRULES*2*sizeof(int));
 }
 
 
@@ -654,6 +626,8 @@ int p3_crossprod()
     printf("chunk[%d] has %d/%d cbm\n", 0, p3_cbm_num, table_size);
     dump_phase_table(p3_table, table_size, RUNLEN);
     do_cbm_stats(p3_table, table_size, p3_cbm, p3_cbm_num, 0);
+
+    dump_intersect_stats();
 }
 
 
@@ -744,6 +718,8 @@ int main(int argc, char* argv[]){
     dump_rulelist_len_count();
 
     do_rfc_stats();
+
+    dump_hash_stats();
 
     printf("\n");
 

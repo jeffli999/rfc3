@@ -3,18 +3,19 @@
 #define MAXCHUNKS	7
 
 struct range{
-  unsigned low;
-  unsigned high;
+    unsigned low;
+    unsigned high;
 };
 
 typedef struct pc_rule{
-  struct range field[MAXDIMENSIONS];
+    struct range field[MAXDIMENSIONS];
 } pc_rule_t;
 
 typedef struct cbm_entry {
-  int numrules;
-  int *rulelist;
-  int rulesum;
+    int	id;
+    int numrules;
+    int *rulelist;
+    int rulesum;
 } cbm_t;
 
 typedef struct eq_entry {
