@@ -1,5 +1,5 @@
 CPP = gcc
-CFLAGS = -pg
+CFLAGS = -g
 
 rfc: rfc.c
 	${CPP} ${CFLAGS} -o rfc rfc.c
