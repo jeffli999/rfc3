@@ -243,11 +243,11 @@ int dump_endpoints()
     int	    chunk, i;
 
     for (chunk = 0; chunk < MAXCHUNKS; chunk++) {
-	printf("\nend_points[%d]: %d\n", chunk, num_epoints[chunk]);
+	printf("end_points[%d]: %d\n", chunk, num_epoints[chunk]);
 	//for (i = 0; i < num_epoints[chunk]; i++)
 	//   printf("%x  ", epoints[chunk][i]);
     }
-    printf("\n\n");
+    printf("\n");
 
 }
 
@@ -367,9 +367,10 @@ int get_epoint_rules(int chunk, int point, int *rules, int *rulesum)
 	high = ruleset[i].field[f].high >> k & 0xFFFF;
 	if (low <= point && high >= point) {
 	    rules[nrules++] = i;
-	    rulesum += i;
+	    *rulesum += i;
 	}
     }
+    return nrules;
 }
 
 
@@ -422,7 +423,7 @@ void gen_p0_cbm(int chunk)
     }
 
     free_cbm_hash();
-    printf("chunk[%d] has %d cbm\n", chunk, phase_num_cbms[0][chunk]);
+    printf("Chunk[%d]: %d CBMs\n", chunk, phase_num_cbms[0][chunk]);
     //dump_phase_table(p0_table[chunk], 65536);
 }
 
@@ -435,7 +436,7 @@ int gen_p0_tables()
 	gen_p0_cbm(chunk);
 	do_cbm_stats(0, chunk, 0);
     }
-    dump_intersect_stats();
+    //dump_intersect_stats();
     bzero(intersect_stats, MAXRULES*2*sizeof(long));
 }
 
@@ -492,15 +493,13 @@ void crossprod_2chunk(int phase, int chunk, cbm_t *cbms1, int n1, cbm_t *cbms2, 
 }
 
 
-
 static int cbm_stat_cmp(const void *p, const void *q)
 {
     return ((cbm_stat_t *)q)->count - ((cbm_stat_t *)p)->count;
 }
 
 
-
-// get the 10 most frequent eqid in a phase table, and output them with their numbers of times in the phase table
+// get the 10 most frequent CBMs in a phase table, and output them with their numbers of times in the phase table
 // flag = 1: output the detail of each cbm; flag = 0: no detail on each cbm
 int do_cbm_stats(int phase, int chunk, int flag)
 {
@@ -518,11 +517,11 @@ int do_cbm_stats(int phase, int chunk, int flag)
 	stats[phase_tables[phase][chunk][i]].count++;
     qsort(stats, phase_num_cbms[phase][chunk], sizeof(cbm_stat_t), cbm_stat_cmp);
 
-    m = phase_table_sizes[phase][chunk] >> 5;
+    m = phase_table_sizes[phase][chunk] >> 6;
     for (i = 0; i < phase_num_cbms[phase][chunk]; i++) {
 	if (stats[i].count <= m)
 	    break;
-	printf("    eqid[%d]: %d\n", stats[i].id, stats[i].count);
+	printf("    CBM[%d] * %d\n", stats[i].id, stats[i].count);
 	total += stats[i].count;
 	if (flag) {
 	    printf("    ");
@@ -532,13 +531,12 @@ int do_cbm_stats(int phase, int chunk, int flag)
 	    printf("\n");
 	}
     }
-    printf("%d/%d\n", total, n);
+
+    printf("    = %d%%\n", total*100 / phase_table_sizes[phase][chunk]);
     free(stats);
 }
 
 
-
-#define RUNLEN   8
 int p1_crossprod()
 {
     int	    table_size, n1, n2;
@@ -553,7 +551,7 @@ int p1_crossprod()
     phase_table_sizes[1][0] = table_size;
     phase_tables[1][0] = (int *) malloc(table_size*sizeof(int));
     crossprod_2chunk(1, 0, cbms1, n1, cbms2, n2);
-    printf("chunk[%d] has %d/%d cbm\n", 0, phase_num_cbms[1][0], table_size);
+    printf("chunk[%d]: %d CBMs in Table[%d]\n", 0, phase_num_cbms[1][0], table_size);
     do_cbm_stats(1, 0, 0);
 
     // DIP[31:16] x DIP[15:0]
@@ -565,7 +563,7 @@ int p1_crossprod()
     phase_table_sizes[1][1] = table_size;
     phase_tables[1][1] = (int *) malloc(table_size*sizeof(int));
     crossprod_2chunk(1, 1, cbms1, n1, cbms2, n2);
-    printf("chunk[%d] has %d/%d cbm\n", 1, phase_num_cbms[1][1], table_size);
+    printf("Chunk[%d]: %d CBMs in Table[%d]\n", 1, phase_num_cbms[1][1], table_size);
     do_cbm_stats(1, 1, 0);
 
     // DP x SP
@@ -577,13 +575,12 @@ int p1_crossprod()
     phase_table_sizes[1][2] = table_size;
     phase_tables[1][2] = (int *) malloc(table_size*sizeof(int));
     crossprod_2chunk(1, 2, cbms1, n1, cbms2, n2);
-    printf("chunk[%d] has %d/%d cbm\n", 2,phase_num_cbms[1][2], table_size);
+    printf("Chunk[%d]: %d CBMs in Table[%d]\n", 2,phase_num_cbms[1][2], table_size);
     do_cbm_stats(1, 2, 0);
 
-    dump_intersect_stats();
+    //dump_intersect_stats();
     bzero(intersect_stats, MAXRULES*2*sizeof(long));
 }
-
 
 
 int p2_crossprod()
@@ -600,7 +597,7 @@ int p2_crossprod()
     phase_table_sizes[2][0] = table_size;
     phase_tables[2][0] = (int *) malloc(table_size*sizeof(int));
     crossprod_2chunk(2, 0, cbms1, n1, cbms2, n2);
-    printf("chunk[%d] has %d/%d cbm\n", 0, phase_num_cbms[2][0], table_size);
+    printf("Chunk[%d]: %d CBMs in Table[%d]\n", 0, phase_num_cbms[2][0], table_size);
     do_cbm_stats(2, 0, 0);
 
     // PROTO x (DP x SP)
@@ -612,13 +609,12 @@ int p2_crossprod()
     phase_table_sizes[2][1] = table_size;
     phase_tables[2][1] = (int *) malloc(table_size*sizeof(int));
     crossprod_2chunk(2, 1, cbms1, n1, cbms2, n2);
-    printf("chunk[%d] has %d/%d cbm\n", 0, phase_num_cbms[2][1], table_size);
+    printf("Chunk[%d]: %d CBMs in Table[%d]\n", 0, phase_num_cbms[2][1], table_size);
     do_cbm_stats(2, 1, 0);
 
-    dump_intersect_stats();
+    //dump_intersect_stats();
     bzero(intersect_stats, MAXRULES*2*sizeof(long));
 }
-
 
 
 int p3_crossprod()
@@ -635,12 +631,11 @@ int p3_crossprod()
     phase_table_sizes[3][0] = table_size;
     phase_tables[3][0] = (int *) malloc(table_size*sizeof(int));
     crossprod_2chunk(3, 0, cbms1, n1, cbms2, n2);
-    printf("chunk[%d] has %d/%d cbm\n", 0, phase_num_cbms[3][0], table_size);
+    printf("Chunk[%d]: %d CBMs in Table[%d]\n", 0, phase_num_cbms[3][0], table_size);
     do_cbm_stats(3, 0, 0);
 
-    dump_intersect_stats();
+    //dump_intersect_stats();
 }
-
 
 
 int do_rfc_stats()
@@ -682,7 +677,6 @@ int do_rfc_stats()
 }
 
 
-
 int main(int argc, char* argv[]){
 
     int i,j,k;
@@ -706,44 +700,29 @@ int main(int argc, char* argv[]){
     ruleset = (pc_rule_t *) calloc(numrules, sizeof(pc_rule_t));
     numrules = loadrule(fpr, ruleset);
 
-    printf("the number of rules = %d\n", numrules);
+    printf("Number of rules: %d\n\n", numrules);
 
     gen_endpoints();
     dump_endpoints();
 
     t = clock();
-    printf("\nPhase 0: \n");
-    printf("===========================================\n");
     gen_p0_tables();
-    printf("***Phase 0 spent %lds\n", (clock()-t)/1000000);
-    fprintf(stderr, "***Phase 0 spent %lds\n", (clock()-t)/1000000);
+    printf("***Phase 0 spent %lds\n\n", (clock()-t)/1000000);
 
     t = clock();
-    printf("\nPhase 1: \n");
-    printf("===========================================\n");
     p1_crossprod();
-    printf("***Phase 1 spent %lds\n", (clock()-t)/1000000);
-    fprintf(stderr, "***Phase 1 spent %lds\n", (clock()-t)/1000000);
+    printf("***Phase 1 spent %lds\n\n", (clock()-t)/1000000);
 
     t = clock();
-    printf("\nPhase 2: \n");
-    printf("===========================================\n");
     p2_crossprod();
-    printf("***Phase 2 spent %lds\n", (clock()-t)/1000000);
-    fprintf(stderr, "***Phase 2 spent %lds\n", (clock()-t)/1000000);
+    printf("***Phase 2 spent %lds\n\n", (clock()-t)/1000000);
 
     t = clock();
-    printf("\nPhase 3: \n");
-    printf("===========================================\n");
     p3_crossprod();
-    printf("***Phase 3 spent %lds\n", (clock()-t)/1000000);
-    fprintf(stderr, "***Phase 3 spent %lds\n", (clock()-t)/1000000);
-
-    dump_rules_len_count();
+    printf("***Phase 3 spent %lds\n\n", (clock()-t)/1000000);
 
     do_rfc_stats();
-
-    dump_hash_stats();
+    //dump_hash_stats();
 
     printf("\n");
 
