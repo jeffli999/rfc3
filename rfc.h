@@ -1,6 +1,7 @@
 #define MAXRULES	65536
 #define MAXDIMENSIONS	5
 #define MAXCHUNKS	7
+#define MAXPHASES	4
 
 struct range{
     unsigned low;

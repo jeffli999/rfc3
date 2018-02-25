@@ -17,35 +17,21 @@
 #include <time.h>
 #include "rfc.h"
 
-int  phase = 4;  // number of pahses
+int  phase = 4;  // number of phases
 FILE *fpr;       // ruleset file
 FILE *fpt;       // test trace file
 
 int	numrules=0;  // actual number of rules in rule set
-struct pc_rule *rules; 
+struct pc_rule *ruleset; 
 
 int	epoints[MAXCHUNKS][MAXRULES*2+2];
 int	num_epoints[MAXCHUNKS];
+cbm_t	*phase_cbms[PHASES][MAXCHUNKS];
+int	phase_num_cbms[PHASES][MAXCHUNKS];
+int	*phase_tables[PHASES][MAXCHUNKS];
+int	phase_table_sizes[PHASES][MAXCHUNKS];
 
-int	p0_table[7][65536];	//phase 0 chunk tables
-int	*p1_table[4];		//phase 1 chunk tables
-int	*p2_table[2];  		//phase 2 chunk tables
-int	*p3_table;     		//phase 3 chunk tables
-int	p1_table_size[4];	//size of the phase 1 tables
-int	p2_table_size[2];	//size of the phase 2 tables
-int	p3_table_size;		//size of the phase 3 tables
-
-
-cbm_t	*p0_cbm[7];		//phase 0 chunk equivalence class
-cbm_t	*p1_cbm[4];		//phase 1 chunk equivalence class
-cbm_t	*p2_cbm[2];		//phase 2 chunk equivalence class
-cbm_t	*p3_cbm;		//phase 3 chunk equivalence class
-int	p0_cbm_num[7];		//phase 0 number of chunk equivalence classes
-int	p1_cbm_num[4];          //phase 1 number of chunk equivalence classes
-int	p2_cbm_num[2];          //phase 2 number of chunk equivalence classes
-int	p3_cbm_num;		//phase 3 number of chunk equivalence classes
-
-int	rulelist_len_count[64];
+int	rules_len_count[MAXRULES+1];
 
 // cbm_lookup() works slow when there is a large number of CBMs,
 // To speed up, we can limit its search to CBMs with the same rulesum
@@ -176,62 +162,62 @@ int loadrule(FILE *fp, pc_rule_t *rule){
     while(1) {
 	if(fscanf(fp,"@%d.%d.%d.%d/%d %d.%d.%d.%d/%d %d : %d %d : %d %x/%x\n", 
 		    &sip1, &sip2, &sip3, &sip4, &siplen, &dip1, &dip2, &dip3, &dip4, &diplen, 
-		    &rules[i].field[3].low, &rules[i].field[3].high, &rules[i].field[4].low, &rules[i].field[4].high,
+		    &ruleset[i].field[3].low, &ruleset[i].field[3].high, &ruleset[i].field[4].low, &ruleset[i].field[4].high,
 		    &proto, &protomask) != 16) break;
 	if(siplen == 0) {
-	    rules[i].field[0].low = 0;
-	    rules[i].field[0].high = 0xFFFFFFFF;
+	    ruleset[i].field[0].low = 0;
+	    ruleset[i].field[0].high = 0xFFFFFFFF;
 	} else if(siplen > 0 && siplen <= 8) {
 	    tmp = sip1<<24;
-	    rules[i].field[0].low = tmp;
-	    rules[i].field[0].high = rules[i].field[0].low + (1<<(32-siplen)) - 1;
+	    ruleset[i].field[0].low = tmp;
+	    ruleset[i].field[0].high = ruleset[i].field[0].low + (1<<(32-siplen)) - 1;
 	}else if(siplen > 8 && siplen <= 16) {
 	    tmp = sip1<<24; tmp += sip2<<16;
-	    rules[i].field[0].low = tmp; 	
-	    rules[i].field[0].high = rules[i].field[0].low + (1<<(32-siplen)) - 1;	
+	    ruleset[i].field[0].low = tmp; 	
+	    ruleset[i].field[0].high = ruleset[i].field[0].low + (1<<(32-siplen)) - 1;	
 	}else if(siplen > 16 && siplen <= 24) {
 	    tmp = sip1<<24; tmp += sip2<<16; tmp +=sip3<<8; 
-	    rules[i].field[0].low = tmp; 	
-	    rules[i].field[0].high = rules[i].field[0].low + (1<<(32-siplen)) - 1;			
+	    ruleset[i].field[0].low = tmp; 	
+	    ruleset[i].field[0].high = ruleset[i].field[0].low + (1<<(32-siplen)) - 1;			
 	}else if(siplen > 24 && siplen <= 32) {
 	    tmp = sip1<<24; tmp += sip2<<16; tmp += sip3<<8; tmp += sip4;
-	    rules[i].field[0].low = tmp; 
-	    rules[i].field[0].high = rules[i].field[0].low + (1<<(32-siplen)) - 1;	
+	    ruleset[i].field[0].low = tmp; 
+	    ruleset[i].field[0].high = ruleset[i].field[0].low + (1<<(32-siplen)) - 1;	
 	}else {
 	    printf("Src IP length exceeds 32\n");
 	    return 0;
 	}
 
 	if(diplen == 0) {
-	    rules[i].field[1].low = 0;
-	    rules[i].field[1].high = 0xFFFFFFFF;
+	    ruleset[i].field[1].low = 0;
+	    ruleset[i].field[1].high = 0xFFFFFFFF;
 	}else if(diplen > 0 && diplen <= 8) {
 	    tmp = dip1<<24;
-	    rules[i].field[1].low = tmp;
-	    rules[i].field[1].high = rules[i].field[1].low + (1<<(32-diplen)) - 1;
+	    ruleset[i].field[1].low = tmp;
+	    ruleset[i].field[1].high = ruleset[i].field[1].low + (1<<(32-diplen)) - 1;
 	}else if(diplen > 8 && diplen <= 16) {
 	    tmp = dip1<<24; tmp +=dip2<<16;
-	    rules[i].field[1].low = tmp; 	
-	    rules[i].field[1].high = rules[i].field[1].low + (1<<(32-diplen)) - 1;	
+	    ruleset[i].field[1].low = tmp; 	
+	    ruleset[i].field[1].high = ruleset[i].field[1].low + (1<<(32-diplen)) - 1;	
 	}else if(diplen > 16 && diplen <= 24) {
 	    tmp = dip1<<24; tmp +=dip2<<16; tmp+=dip3<<8;
-	    rules[i].field[1].low = tmp; 	
-	    rules[i].field[1].high = rules[i].field[1].low + (1<<(32-diplen)) - 1;			
+	    ruleset[i].field[1].low = tmp; 	
+	    ruleset[i].field[1].high = ruleset[i].field[1].low + (1<<(32-diplen)) - 1;			
 	}else if(diplen > 24 && diplen <= 32) {
 	    tmp = dip1<<24; tmp +=dip2<<16; tmp+=dip3<<8; tmp +=dip4;
-	    rules[i].field[1].low = tmp; 	
-	    rules[i].field[1].high = rules[i].field[1].low + (1<<(32-diplen)) - 1;	
+	    ruleset[i].field[1].low = tmp; 	
+	    ruleset[i].field[1].high = ruleset[i].field[1].low + (1<<(32-diplen)) - 1;	
 	}else {
 	    printf("Dest IP length exceeds 32\n");
 	    return 0;
 	}
 
 	if(protomask == 0xFF) {
-	    rules[i].field[2].low = proto;
-	    rules[i].field[2].high = proto;
+	    ruleset[i].field[2].low = proto;
+	    ruleset[i].field[2].high = proto;
 	} else if(protomask == 0) {
-	    rules[i].field[2].low = 0;
-	    rules[i].field[2].high = 0xFF;
+	    ruleset[i].field[2].low = 0;
+	    ruleset[i].field[2].high = 0xFF;
 	} else {
 	    printf("Protocol mask error\n");
 	    return 0;
@@ -292,8 +278,8 @@ int gen_endpoints()
 	f = chunk_to_field[chunk];
 	k = shamt[chunk];
 	for (i = 0; i < numrules; i++) {
-	    epoints[chunk][2*i+1] = (rules[i].field[f].low >> k) & 0xFFFF;
-	    epoints[chunk][2*i+2] = (rules[i].field[f].high >> k) & 0xFFFF;
+	    epoints[chunk][2*i+1] = (ruleset[i].field[f].low >> k) & 0xFFFF;
+	    epoints[chunk][2*i+2] = (ruleset[i].field[f].high >> k) & 0xFFFF;
 	}
 	epoints[chunk][2*i+1] = 65535;
     }
@@ -369,59 +355,72 @@ void add_to_hash(cbm_t *cbm)
 }
 
 
-int gen_p0_cbm(int chunk)
+int get_epoint_rules(int chunk, int point, int *rules, int *rulesum)
 {
-    int		cbm_rules[MAXRULES], nrules, rulesum;
-    int		i, j, f, k, r, len, low, high, point, next_point, cbm_id, num_cbm = 0, cbm_set_size = 64;
+    int	    nrules = 0, i, f, k, low, high;
 
     f = chunk_to_field[chunk];
     k = shamt[chunk];
-    p0_cbm[chunk] = (cbm_t *) malloc(cbm_set_size * sizeof(cbm_t));
-    init_cbm_hash();
+    *rulesum = 0;
+    for (i = 0; i < numrules; i++) {
+	low = ruleset[i].field[f].low >> k & 0xFFFF;
+	high = ruleset[r].field[f].high >> k & 0xFFFF;
+	if (low <= point && high >= point) {
+	    rules[nrules++] = i;
+	    rulesum += i;
+	}
+    }
+}
 
+
+int new_cbm(int phase, int chunk, int *rules, int nrules, int rulesum)
+{
+    static int cbm_sizes[PHASES][MAXCHUNKS];
+    cbm_t   *cbms;
+
+    if (phase_num_cbms[phase][chunk] == cbm_sizes[phase][chunk]) {
+	cbm_sizes[phase][chunk] += 64;
+	phase_cbms[phase][chunk] = realloc(phase_cbms[phase][chunk], cbm_sizes[phase][chunk]*sizeof(cbm_t));
+    }
+    cbms = phase_cbms[phase][chunk];
+    cbm_id = phase_num_cbms[phase][chunk];
+    cbms[cbm_id].id = cbm_id;
+    cbms[cbm_id].rulesum = rulesum;
+    cbms[cbm_id].nrules = nrules;
+    cbms[cbm_id].rules = (int *) malloc(nrules*sizeof(int));
+    memcpy(cbms[cbm_id].rules, rules, nrules*sizeof(int));
+    phase_num_cbms[phase][chunk]++;
+
+    add_to_hash(&cbms[cbm_id]);
+    rules_len_count[nrules]++;
+
+    return cbm_id;
+}
+
+
+void gen_p0_cbm(int chunk)
+{
+    int		rules[MAXRULES], nrules, rulesum, next_point, cbm_id, i, j;
+
+    init_cbm_hash();
     for (i = 0; i < num_epoints[chunk]; i++) {
 	// 1. generate a cbm
-	point = epoints[chunk][i];
-	nrules = 0;
-	rulesum = 0;
-	for (r = 0; r < numrules; r++) {
-	    low = rules[r].field[f].low >> k & 0xFFFF;
-	    high = rules[r].field[f].high >> k & 0xFFFF;
-	    if (low <= point && high >= point) {
-		cbm_rules[nrules++] = r;
-		rulesum += r;
-	    }
-	}
+	nrules = get_epoint_rules(chunk, epoints[chunk][i], rules, &rulesum);
 
 	// 2. check whether the generated cbm exists
-	cbm_id = cbm_lookup(cbm_rules, nrules, rulesum, p0_cbm[chunk]);
-	if (cbm_id <  0) {
-	    // 3. this is a new cbm, add it to the cbm_set
-	    cbm_id = num_cbm;
-	    p0_cbm[chunk][cbm_id].id = cbm_id;
-	    p0_cbm[chunk][cbm_id].nrules = nrules;
-	    p0_cbm[chunk][cbm_id].rules = (int *) malloc(nrules * sizeof(int));
-	    p0_cbm[chunk][cbm_id].rulesum = rulesum;
-	    memcpy(p0_cbm[chunk][cbm_id].rules, cbm_rules, nrules * sizeof(int));
-	    if (++num_cbm == cbm_set_size) {
-		cbm_set_size += 64;
-		p0_cbm[chunk] = realloc(p0_cbm[chunk], cbm_set_size*sizeof(cbm_t));
-	    }
-
-	    add_to_hash(&p0_cbm[chunk][cbm_id]);
-	    len = nrules > 63 ? 63 : nrules;
-	    rulelist_len_count[len]++;
-	}
+	cbm_id = cbm_lookup(rules, nrules, rulesum, p0_cbm[chunk]);
+	if (cbm_id <  0) // 3. this is a new cbm, add it to the cbm_set
+	    cbm_id = new_cbm(0, chunk, rules, nrules, rulesum);
 
 	// 4. fill the corresponding p0 chunk table with the eqid (cbm_id)
 	next_point = (i == num_epoints[chunk] - 1) ? 65536 : epoints[chunk][i+1];
-	for (j = point; j < next_point; j++)
-	    p0_table[chunk][j] = cbm_id;
+	for (j = epoints[chunk][i]; j < next_point; j++)
+	    phase_tables[0][chunk][j] = cbm_id;
     }
+
     free_cbm_hash();
-    printf("chunk[%d] has %d cbm\n", chunk, num_cbm);
+    printf("chunk[%d] has %d cbm\n", chunk, phase_num_cbms[0][chunk]);
     //dump_phase_table(p0_table[chunk], 65536);
-    return num_cbm;
 }
 
 
@@ -430,7 +429,7 @@ int gen_p0_tables()
     int		chunk;
 
     for (chunk = 0; chunk < MAXCHUNKS; chunk++) {
-	p0_cbm_num[chunk] = gen_p0_cbm(chunk);
+	gen_p0_cbm(chunk);
 	do_cbm_stats(p0_table[chunk], 65536, p0_cbm[chunk], p0_cbm_num[chunk], 0);
     }
     dump_intersect_stats();
@@ -519,30 +518,32 @@ static int cbm_stat_cmp(const void *p, const void *q)
 
 // get the 10 most frequent eqid in a phase table, and output them with their numbers of times in the phase table
 // flag = 1: output the detail of each cbm; flag = 0: no detail on each cbm
-int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int num_cbm, int flag)
+int do_cbm_stats(int phase, int chunk, int flag)
 {
     cbm_stat_t	*stats = (cbm_stat_t *) malloc(num_cbm*sizeof(cbm_stat_t));
     int		i, k, m, total = 0;
 
-    for (i = 0; i < num_cbm; i++) {
+    n = phase_num_cbms[phase][chunk];
+    stats = (cbm_stat_t *) malloc(n*sizeof(cbm_stat_t));
+
+    for (i = 0; i < phase_num_cbms[phase][chunk]; i++) {
 	stats[i].id = i;
 	stats[i].count = 0;
     }
-    for (i = 0; i < n; i++) {
-	stats[table[i]].count++;
-    }
-    qsort(stats, num_cbm, sizeof(cbm_stat_t), cbm_stat_cmp);
+    for (i = 0; i < phase_table_sizes[phase][chunk]; i++)
+	stats[phase_tables[phase][chunk][i]].count++;
+    qsort(stats, phase_num_cbms[phase][chunk], sizeof(cbm_stat_t), cbm_stat_cmp);
 
-    m = num_cbm > 16 ? 16 : num_cbm;
-    for (i = 0; i < m; i++) {
-	if (stats[i].count == 1)
+    m = phase_table_sizes[phase][chunk] >> 5;
+    for (i = 0; i < phase_num_cbms[phase][chunk]; i++) {
+	if (stats[i].count <= m)
 	    break;
 	printf("    eqid[%d]: %d\n", stats[i].id, stats[i].count);
 	total += stats[i].count;
 	if (flag) {
 	    printf("    ");
-	    for (k = 0; k < cbm_set[stats[i].id].nrules; k++) {
-		printf("%d  ", cbm_set[stats[i].id].rules[k]);
+	    for (k = 0; k < phase_cbms[phase][chunk][stats[i].id].nrules; k++) {
+		printf("%d  ", phase_cbms[phase][chunk][stats[i].id].rules[k]);
 	    }
 	    printf("\n");
 	}
