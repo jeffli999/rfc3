@@ -13,8 +13,8 @@ typedef struct pc_rule{
 
 typedef struct cbm_entry {
     int	id;
-    int numrules;
-    int *rulelist;
+    int nrules;
+    int *rules;
     int rulesum;
 } cbm_t;
 

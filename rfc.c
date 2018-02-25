@@ -112,7 +112,7 @@ void free_cbm_hash()
 }
 
 
-int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int cbm_num, int flag);
+int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int num_cbm, int flag);
 
 
 int dump_rulelist_len_count()
@@ -255,8 +255,8 @@ int dump_endpoints()
 
     for (chunk = 0; chunk < MAXCHUNKS; chunk++) {
 	printf("\nend_points[%d]: %d\n", chunk, num_epoints[chunk]);
-	for (i = 0; i < num_epoints[chunk]; i++)
-	    printf("%x  ", epoints[chunk][i]);
+	//for (i = 0; i < num_epoints[chunk]; i++)
+	//   printf("%x  ", epoints[chunk][i]);
     }
     printf("\n\n");
 
@@ -314,16 +314,16 @@ int compare_rules(int *rules1, int *rules2, int n)
 }
 
 
-int cbm_lookup(int *cbm_rules, int num_cbm_rules, int rulesum, cbm_t *cbm_set)
+int cbm_lookup(int *cbm_rules, int nrules, int rulesum, cbm_t *cbm_set)
 {
     int	    h, i, n, id, match = 0;
 
     h = rulesum % HASH_TAB_SIZE;
     for (i = 0; i < cbm_hash_num[h]; i++) {
 	id = cbm_hash[h][i];
-	if (cbm_set[id].numrules != num_cbm_rules)
+	if (cbm_set[id].nrules != nrules)
 	    continue;
-	if (memcmp(cbm_rules, cbm_set[id].rulelist, num_cbm_rules*sizeof(int)) == 0) {
+	if (memcmp(cbm_rules, cbm_set[id].rules, nrules*sizeof(int)) == 0) {
 	    hash_stats[i+1]++;
 	    return id;
 	}
@@ -371,7 +371,7 @@ void add_to_hash(cbm_t *cbm)
 
 int gen_p0_cbm(int chunk)
 {
-    int		cbm_rules[MAXRULES], num_cbm_rules, rulesum;
+    int		cbm_rules[MAXRULES], nrules, rulesum;
     int		i, j, f, k, r, len, low, high, point, next_point, cbm_id, num_cbm = 0, cbm_set_size = 64;
 
     f = chunk_to_field[chunk];
@@ -382,35 +382,34 @@ int gen_p0_cbm(int chunk)
     for (i = 0; i < num_epoints[chunk]; i++) {
 	// 1. generate a cbm
 	point = epoints[chunk][i];
-	num_cbm_rules = 0;
+	nrules = 0;
 	rulesum = 0;
 	for (r = 0; r < numrules; r++) {
 	    low = rules[r].field[f].low >> k & 0xFFFF;
 	    high = rules[r].field[f].high >> k & 0xFFFF;
 	    if (low <= point && high >= point) {
-		cbm_rules[num_cbm_rules++] = r;
+		cbm_rules[nrules++] = r;
 		rulesum += r;
 	    }
 	}
 
 	// 2. check whether the generated cbm exists
-	cbm_id = cbm_lookup(cbm_rules, num_cbm_rules, rulesum, p0_cbm[chunk]);
+	cbm_id = cbm_lookup(cbm_rules, nrules, rulesum, p0_cbm[chunk]);
 	if (cbm_id <  0) {
 	    // 3. this is a new cbm, add it to the cbm_set
 	    cbm_id = num_cbm;
 	    p0_cbm[chunk][cbm_id].id = cbm_id;
-	    p0_cbm[chunk][cbm_id].numrules = num_cbm_rules;
-	    p0_cbm[chunk][cbm_id].rulelist = (int *) malloc(num_cbm_rules * sizeof(int));
+	    p0_cbm[chunk][cbm_id].nrules = nrules;
+	    p0_cbm[chunk][cbm_id].rules = (int *) malloc(nrules * sizeof(int));
 	    p0_cbm[chunk][cbm_id].rulesum = rulesum;
-	    memcpy(p0_cbm[chunk][cbm_id].rulelist, cbm_rules, num_cbm_rules * sizeof(int));
+	    memcpy(p0_cbm[chunk][cbm_id].rules, cbm_rules, nrules * sizeof(int));
 	    if (++num_cbm == cbm_set_size) {
 		cbm_set_size += 64;
 		p0_cbm[chunk] = realloc(p0_cbm[chunk], cbm_set_size*sizeof(cbm_t));
 	    }
 
-	    // record rulelists in different lengths, s.t. to speed up cbm_lookup()
 	    add_to_hash(&p0_cbm[chunk][cbm_id]);
-	    len = num_cbm_rules > 63 ? 63 : num_cbm_rules;
+	    len = nrules > 63 ? 63 : nrules;
 	    rulelist_len_count[len]++;
 	}
 
@@ -444,12 +443,12 @@ int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *cbm_rules, int *rulesum)
     int	    i = 0, j = 0, n = 0, ncmp = 0;
 
     *rulesum = 0;
-    while (i < c1->numrules && j < c2->numrules) {
-	if (c1->rulelist[i] == c2->rulelist[j]) {
-	    cbm_rules[n++] = c1->rulelist[i];
-	    *rulesum += c1->rulelist[i];
+    while (i < c1->nrules && j < c2->nrules) {
+	if (c1->rules[i] == c2->rules[j]) {
+	    cbm_rules[n++] = c1->rules[i];
+	    *rulesum += c1->rules[i];
 	    i++; j++;
-	} else if (c1->rulelist[i] > c2->rulelist[j]) {
+	} else if (c1->rules[i] > c2->rules[j]) {
 	    j++;
 	} else {
 	    i++;
@@ -464,7 +463,7 @@ int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *cbm_rules, int *rulesum)
 cbm_t* crossprod_2chunk(cbm_t *cbm_set1, int n1, cbm_t *cbm_set2, int n2, int *num_cpd, int *cpd_tab)
 {
     int	    i, j, len, cbm_id, n = 0, cpd_set_size = MAXRULES;
-    int	    cbm_rules[MAXRULES], num_cbm_rules, rulesum;
+    int	    cbm_rules[MAXRULES], nrules, rulesum;
     cbm_t   *cpd_set;
     
     cpd_set = (cbm_t *) malloc(cpd_set_size*sizeof(cbm_t));
@@ -479,24 +478,24 @@ cbm_t* crossprod_2chunk(cbm_t *cbm_set1, int n1, cbm_t *cbm_set2, int n2, int *n
 
 	for (j =  0; j < n2; j++) {
 	    // 1. generate the intersect of two cbms from two chunks
-	    num_cbm_rules = cbm_2intersect(&cbm_set1[i], &cbm_set2[j], cbm_rules, &rulesum);
+	    nrules = cbm_2intersect(&cbm_set1[i], &cbm_set2[j], cbm_rules, &rulesum);
 	    // 2. check whether the intersect cbm exists in crossproducted cbm list so far
-	    cbm_id = cbm_lookup(cbm_rules, num_cbm_rules, rulesum, cpd_set);
+	    cbm_id = cbm_lookup(cbm_rules, nrules, rulesum, cpd_set);
 	    if (cbm_id < 0) {
 		// 3. the intersect cbm is new, so add it to the crossproducted cbm list
 		cbm_id = n;
 		cpd_set[cbm_id].id = cbm_id;
-		cpd_set[cbm_id].numrules = num_cbm_rules;
-		cpd_set[cbm_id].rulelist = (int *) malloc(num_cbm_rules * sizeof(int));
+		cpd_set[cbm_id].nrules = nrules;
+		cpd_set[cbm_id].rules = (int *) malloc(nrules * sizeof(int));
 		cpd_set[cbm_id].rulesum = rulesum;
-		memcpy(cpd_set[cbm_id].rulelist, cbm_rules, num_cbm_rules * sizeof(int));
+		memcpy(cpd_set[cbm_id].rules, cbm_rules, nrules * sizeof(int));
 		if (++n == cpd_set_size) {
 		    cpd_set_size += MAXRULES;
 		    cpd_set = realloc(cpd_set, cpd_set_size*sizeof(cbm_t));
 		}
 
 		add_to_hash(&cpd_set[cbm_id]);
-		len = num_cbm_rules > 63 ? 63 : num_cbm_rules;
+		len = nrules > 63 ? 63 : nrules;
 		rulelist_len_count[len]++;
 	    }
 	    //4. fill the corresponding crossproduct table with the eqid (cmb_id)
@@ -520,21 +519,21 @@ static int cbm_stat_cmp(const void *p, const void *q)
 
 // get the 10 most frequent eqid in a phase table, and output them with their numbers of times in the phase table
 // flag = 1: output the detail of each cbm; flag = 0: no detail on each cbm
-int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int cbm_num, int flag)
+int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int num_cbm, int flag)
 {
-    cbm_stat_t	*stats = (cbm_stat_t *) malloc(cbm_num*sizeof(cbm_stat_t));
+    cbm_stat_t	*stats = (cbm_stat_t *) malloc(num_cbm*sizeof(cbm_stat_t));
     int		i, k, m, total = 0;
 
-    for (i = 0; i < cbm_num; i++) {
+    for (i = 0; i < num_cbm; i++) {
 	stats[i].id = i;
 	stats[i].count = 0;
     }
     for (i = 0; i < n; i++) {
 	stats[table[i]].count++;
     }
-    qsort(stats, cbm_num, sizeof(cbm_stat_t), cbm_stat_cmp);
+    qsort(stats, num_cbm, sizeof(cbm_stat_t), cbm_stat_cmp);
 
-    m = cbm_num > 16 ? 16 : cbm_num;
+    m = num_cbm > 16 ? 16 : num_cbm;
     for (i = 0; i < m; i++) {
 	if (stats[i].count == 1)
 	    break;
@@ -542,8 +541,8 @@ int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int cbm_num, int flag)
 	total += stats[i].count;
 	if (flag) {
 	    printf("    ");
-	    for (k = 0; k < cbm_set[stats[i].id].numrules; k++) {
-		printf("%d  ", cbm_set[stats[i].id].rulelist[k]);
+	    for (k = 0; k < cbm_set[stats[i].id].nrules; k++) {
+		printf("%d  ", cbm_set[stats[i].id].rules[k]);
 	    }
 	    printf("\n");
 	}
@@ -557,7 +556,7 @@ int do_cbm_stats(int *table, int n, cbm_t *cbm_set, int cbm_num, int flag)
 #define RUNLEN   8
 int p1_crossprod()
 {
-    int		cbm_rules[MAXRULES], num_cbm_rules, i, table_size, cbm_set_size = MAXRULES;
+    int		cbm_rules[MAXRULES], i, table_size, cbm_set_size = MAXRULES;
 
     // SIP[31:16] x SIP[15:0]
     table_size = p0_cbm_num[1] * p0_cbm_num[0];
@@ -594,7 +593,7 @@ int p1_crossprod()
 
 int p2_crossprod()
 {
-    int		cbm_rules[MAXRULES], num_cbm_rules, i, table_size;
+    int		cbm_rules[MAXRULES], i, table_size;
 
     // SIP x DIP
     table_size = p1_cbm_num[0] * p1_cbm_num[1];
@@ -622,7 +621,7 @@ int p2_crossprod()
 
 int p3_crossprod()
 {
-    int		cbm_rules[MAXRULES], num_cbm_rules, i, table_size;
+    int		cbm_rules[MAXRULES], i, table_size;
 
     // (SIP x DIP) x (PROTO x (DP x SP))
     table_size = p2_cbm_num[0] * p2_cbm_num[1];
@@ -704,7 +703,7 @@ int main(int argc, char* argv[]){
     printf("the number of rules = %d\n", numrules);
 
     gen_endpoints();
-    //dump_endpoints();
+    dump_endpoints();
 
     t = clock();
     printf("\nPhase 0: \n");
