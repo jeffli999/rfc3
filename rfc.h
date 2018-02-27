@@ -1,5 +1,5 @@
 #define MAXRULES	65536
-#define MAXDIMENSIONS	5
+#define FIELDS		5
 #define MAXCHUNKS	7
 #define PHASES		4
 
@@ -8,8 +8,8 @@ struct range{
     unsigned high;
 };
 
-typedef struct pc_rule{
-    struct range field[MAXDIMENSIONS];
+typedef struct pc_rule {
+    struct range field[FIELDS];
 } pc_rule_t;
 
 typedef struct cbm_entry {

@@ -271,9 +271,6 @@ int gen_endpoints()
 {
     int	    i, f, k, chunk;
     
-    for (chunk = 0; chunk < MAXCHUNKS; chunk++)
-	epoints[0][0] = 0;
-
     for (chunk = 0; chunk < MAXCHUNKS; chunk++) {
 	f = chunk_to_field[chunk];
 	k = shamt[chunk];
@@ -518,6 +515,7 @@ int do_cbm_stats(int phase, int chunk, int flag)
     qsort(stats, phase_num_cbms[phase][chunk], sizeof(cbm_stat_t), cbm_stat_cmp);
 
     m = phase_table_sizes[phase][chunk] >> 6;
+    m = m <= 1 ? 2 : m;
     for (i = 0; i < phase_num_cbms[phase][chunk]; i++) {
 	if (stats[i].count <= m)
 	    break;
@@ -673,7 +671,7 @@ int do_rfc_stats()
 
     for (i = 0; i < 4; i++)
 	total += phase_total[i];
-    printf("\n Total table size: %d\n", total);
+    printf("\nTotal table size: %d\n", total);
 }
 
 
@@ -681,7 +679,7 @@ int main(int argc, char* argv[]){
 
     int i,j,k;
     unsigned a, b, c, d, e, f, g;
-    int header[MAXDIMENSIONS];
+    int header[FIELDS];
     char *s = (char *)calloc(200, sizeof(char));
     int done;
     int fid;
@@ -702,6 +700,9 @@ int main(int argc, char* argv[]){
 
     printf("Number of rules: %d\n\n", numrules);
 
+    test_flow();
+
+    /*
     gen_endpoints();
     dump_endpoints();
 
@@ -725,5 +726,6 @@ int main(int argc, char* argv[]){
     //dump_hash_stats();
 
     printf("\n");
+    */
 
 }  

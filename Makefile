@@ -1,8 +1,8 @@
 CPP = gcc
 CFLAGS = -g
 
-rfc: rfc.c
-	${CPP} ${CFLAGS} -o rfc rfc.c
+rfc: rfc.c flow.c
+	${CPP} ${CFLAGS} -o rfc rfc.c flow.c
 
 all: rfc 
 
