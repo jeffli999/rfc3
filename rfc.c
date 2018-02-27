@@ -700,7 +700,8 @@ int main(int argc, char* argv[]){
 
     printf("Number of rules: %d\n\n", numrules);
 
-    test_flow();
+    create_flows();
+    write_flow_trace("flows.trc");
 
     /*
     gen_endpoints();

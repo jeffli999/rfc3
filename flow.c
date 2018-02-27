@@ -19,7 +19,10 @@ unsigned int	**epoint_hash[FIELDS];
 int		*hash_entry_size[FIELDS];
 int		*hash_entry_num[FIELDS];
 int		epoint_stack[FIELDS];
-int		num_flows;
+int		num_flows;  // current number of flows
+int		size_flows; // current memory size for flows
+flow_entry_t	*flows;
+
 int		stack1[FIELDS], stack2[FIELDS];
 
 
@@ -135,7 +138,14 @@ void gen_field_epoints(int f, int *rules, int nrules)
 		p[num_epoints[f]++] = point;
 	}
     }
-    //sort_field_epoints(field);
+}
+
+
+void dump_field_epoints(int f)
+{
+    int	    i;
+    for (i = 0; i < num_epoints[f]; i++)
+	printf("epoint[%d]: %x\n", i, epoints[f][i]);
 }
 
 
@@ -155,31 +165,48 @@ void collect_epoint_rules(int f, unsigned int point)
 }
 
 
-// generate a flow from: 
+// create a flow from: 
 // 1) the subset of rules in the virtual field[FIELDS]
 // 2) the stack of end points from field[0] ~ field[FIELDS-1]
-int create_flow()
+int create_one_flow()
 {
-    // TODO:
-    num_flows++;
-    if (num_flows > 10000000)
-	exit(1);
-    /*
-    printf("f:%6d : %d/%d -> %d/%d\n", num_flows, 
-	    stack2[0], stack1[0],
-	    stack2[1], stack1[1]);
-    */
+    int	    i;
 
+    if (num_flows == size_flows) {
+	size_flows += INITFLOWS;
+	flows = (flow_entry_t *) realloc(flows, size_flows*sizeof(flow_entry_t));
+    }
+    flows[num_flows].sip = epoint_stack[0];
+    flows[num_flows].dip = epoint_stack[1];
+    flows[num_flows].proto = epoint_stack[2];
+    flows[num_flows].sp = epoint_stack[3];
+    flows[num_flows].dp = epoint_stack[4];
+    if (num_field_rules[FIELDS] == 0)
+	flows[num_flows].match_rule = -1;
+    else
+	flows[num_flows].match_rule = field_rules[FIELDS][0];
+    if (num_field_rules[FIELDS] > 1) {
+	fprintf(stderr, "Overlap: ");
+	for (i = 0; i < num_field_rules[FIELDS]; i++)
+	    fprintf(stderr, "%d ", field_rules[FIELDS][i]);
+	fprintf(stderr, "\n");
+    }
+
+    if (++num_flows == MAXFLOWS)
+	return 1;
+    else
+	return 0;
 }
 
 
-void process_field(int f)
+int process_field(int f)
 {
-    int		    i;
+    int		    finished, i;
+    static int	    old_num_flows = 0;
     unsigned int    point;
 
     if (f == FIELDS) {
-	create_flow();
+	finished = create_one_flow();
     } else {
 	gen_field_epoints(f, field_rules[f], num_field_rules[f]);
 	for (i = 0; i < num_epoints[f]; i++) {
@@ -188,11 +215,16 @@ void process_field(int f)
 	    epoint_stack[f] = point;
 	    stack1[f] = num_epoints[f];
 	    stack2[f] = i;
-	    process_field(f+1);
-	    if (f < 2)
-		printf("f:%6d : %d/%d -> %d/%d\n", num_flows, stack2[0], stack1[0], stack2[1], stack1[1]);
+	    finished = process_field(f+1);
+	    if (f == 0) {
+		printf("f:%x : %d\n", epoint_stack[0], num_flows - old_num_flows);
+		old_num_flows = num_flows;
+	    }
+	    if (finished)
+		break;
 	}
     }
+    return finished;
 }
 
 
@@ -226,10 +258,13 @@ void theory_flows()
 //    and the one with the highest priority will be the matched rule, which will be associated with
 //    a test packet header generated with the n-tuple of end points picked in prevous steps
 // 8: Iterate over the rest end points at each level (field) (Steps 0~7)
-void test_flow()
+void create_flows()
 {
     int		    f, i;
     unsigned int    point;
+
+    size_flows = INITFLOWS;
+    flows = (flow_entry_t *) malloc(size_flows*sizeof(flow_entry_t));
 
     init_epoint_hash();
     theory_flows();
@@ -238,4 +273,47 @@ void test_flow()
     process_field(0);
 
     printf("#flows: %d\n", num_flows);
+
+    dump_flow_trace();
+}
+
+
+void write_flow_trace(char *trace_name)
+{
+    FILE    *ftrace;
+    int	    i;
+
+    ftrace = fopen(trace_name, "w");
+    if (ftrace == NULL) {
+	fprintf(stderr, "Fail to create trace file: %s\n", trace_name);
+	exit(1);
+    }
+    fwrite(&num_flows, sizeof(int), 1, ftrace);
+    fwrite(flows, sizeof(flow_entry_t), num_flows, ftrace);
+    fclose(ftrace);
+}
+
+
+char *ip_int2str(const unsigned int ip, char *str)
+{
+    unsigned char *val = (unsigned char *)&ip;
+
+    sprintf(str, "%u.%u.%u.%u", val[3], val[2], val[1], val[0]);
+    return str;
+}
+
+
+void dump_flow_trace()
+{
+    int	    i;
+    char    ip_str[16];
+
+    for (i = 0; i < num_flows; i++) {
+	printf("%s ", ip_int2str(flows[i].sip, ip_str));
+	printf("%s ", ip_int2str(flows[i].dip, ip_str));
+	printf("%d ", flows[i].proto);
+	printf("%d ", flows[i].sp);
+	printf("%d ", flows[i].dp);
+	printf(": rule[%d]\n", flows[i].match_rule);
+    }
 }
