@@ -3,9 +3,9 @@
 
 typedef struct flow_entry {
     unsigned int    sip, dip;
-    unsigned char   proto;
-    unsigned short  sp, dp;
-    int		    match_rule;
+    uint8_t	    proto;
+    uint16_t	    sp, dp;
+    uint16_t	    match_rule;
 } flow_entry_t;
 
 void create_flows();

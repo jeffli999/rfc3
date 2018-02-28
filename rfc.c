@@ -27,7 +27,7 @@ extern int	    num_flows;	// current number of flows
 FILE	*fpr;		// ruleset file
 FILE	*fpt;		// test packet trace file
 
-int	    numrules;	// actual number of rules in rule set
+uint16_t    numrules;	// actual number of rules in rule set
 pc_rule_t   *ruleset;	// the rule set for packet classification
 
 // functions to be performed by this program, which are specified in command-line parameters
@@ -301,7 +301,7 @@ int gen_endpoints()
 
 
 // check whether two rulelists are the same
-int compare_rules(int *rules1, int *rules2, int n)
+int compare_rules(uint16_t *rules1, uint16_t *rules2, uint16_t n)
 {
     int	    i;
 
@@ -315,7 +315,7 @@ int compare_rules(int *rules1, int *rules2, int n)
 
 // given a rulelist, check whether it is already in the given set of CBMs,
 // return the hit CBM id if there is a match, otherwise return -1
-int cbm_lookup(int *rules, int nrules, int rulesum, cbm_t *cbm_set)
+int cbm_lookup(uint16_t *rules, uint16_t nrules, int rulesum, cbm_t *cbm_set)
 {
     int	    h, i, n, id, match = 0;
 
@@ -324,7 +324,7 @@ int cbm_lookup(int *rules, int nrules, int rulesum, cbm_t *cbm_set)
 	id = cbm_hash[h][i];
 	if (cbm_set[id].nrules != nrules)
 	    continue;
-	if (memcmp(rules, cbm_set[id].rules, nrules*sizeof(int)) == 0) {
+	if (memcmp(rules, cbm_set[id].rules, nrules*sizeof(uint16_t)) == 0) {
 	    hash_stats[i+1]++;
 	    return id;
 	}
@@ -372,9 +372,10 @@ void add_to_hash(cbm_t *cbm)
 
 
 // given an end point on a chunk, collect rules covering it
-int collect_epoint_rules(int chunk, int point, int *rules, int *rulesum)
+int collect_epoint_rules(int chunk, int point, uint16_t *rules, int *rulesum)
 {
-    int	    nrules = 0, i, f, k, low, high;
+    int		f, k, low, high;
+    uint16_t	nrules = 0, i;
 
     f = chunk_to_field[chunk];
     k = shamt[chunk];
@@ -394,18 +395,18 @@ int collect_epoint_rules(int chunk, int point, int *rules, int *rulesum)
 // dump out the rulelist of the CBM
 void dump_cbm_rules(cbm_t *cbm)
 {
-    int	    i;
+    uint16_t	i;
 
     printf("cbm[%d]: ", cbm->id);
     for (i = 0; i < cbm->nrules; i++)
-	printf("%d ", cbm->rules[i]);
+	printf("%u ", cbm->rules[i]);
     printf("\n");
 }
 
 
 // if the rulelist is not in the CBM set of current <phase, chunk>, create a new CBM with this rulelist,
 // and add it into the CBM set of current < phase, chunk> (i.e., phase_cbms[phase][chunk])
-int create_cbm(int phase, int chunk, int *rules, int nrules, int rulesum)
+int create_cbm(int phase, int chunk, uint16_t *rules, uint16_t nrules, int rulesum)
 {
     static int	cbm_sizes[PHASES][MAXCHUNKS];
     int		cbm_id;
@@ -420,8 +421,8 @@ int create_cbm(int phase, int chunk, int *rules, int nrules, int rulesum)
     cbms[cbm_id].id = cbm_id;
     cbms[cbm_id].rulesum = rulesum;
     cbms[cbm_id].nrules = nrules;
-    cbms[cbm_id].rules = (int *) malloc(nrules*sizeof(int));
-    memcpy(cbms[cbm_id].rules, rules, nrules*sizeof(int));
+    cbms[cbm_id].rules = (uint16_t *) malloc(nrules*sizeof(uint16_t));
+    memcpy(cbms[cbm_id].rules, rules, nrules*sizeof(uint16_t));
     phase_num_cbms[phase][chunk]++;
 
     add_to_hash(&cbms[cbm_id]);
@@ -435,7 +436,8 @@ int create_cbm(int phase, int chunk, int *rules, int nrules, int rulesum)
 // the corresponding CBM ids
 void gen_p0_cbm(int chunk)
 {
-    int		rules[MAXRULES], nrules, rulesum, next_point, cbm_id, i, j, table_size = 65536;
+    uint16_t	rules[MAXRULES], nrules; 
+    int		rulesum, next_point, cbm_id, i, j, table_size = 65536;
 
     phase_table_sizes[0][chunk] = table_size;
     phase_tables[0][chunk] = (int *) malloc(table_size*sizeof(int));
@@ -476,9 +478,10 @@ int gen_p0_tables()
 
 
 // intersecting the rulelists of two CBMs (each from current CBMs for constructing a CBM set in next phase)
-int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *rules, int *rulesum)
+int cbm_2intersect(cbm_t *c1, cbm_t *c2, uint16_t *rules, int *rulesum)
 {
-    int	    i = 0, j = 0, n = 0, ncmp = 0;
+    int		n = 0, ncmp = 0;
+    uint16_t	i = 0, j = 0;
 
     *rulesum = 0;
     while (i < c1->nrules && j < c2->nrules) {
@@ -502,8 +505,8 @@ int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *rules, int *rulesum)
 // and populate the corresponding phase table in next phase with the generated CBM set
 void crossprod_2chunk(int phase, int chunk, cbm_t *cbms1, int n1, cbm_t *cbms2, int n2)
 {
-    int	    i, j, len, cbm_id, cpd_size = n1 * n2;
-    int	    rules[MAXRULES], nrules, rulesum;
+    int		i, j, cbm_id, rulesum, cpd_size = n1 * n2;
+    uint16_t	rules[MAXRULES], nrules;
     
     phase_cbms[phase][chunk] = (cbm_t *) malloc(cpd_size*sizeof(cbm_t));
     init_cbm_hash();
@@ -564,7 +567,7 @@ int do_cbm_stats(int phase, int chunk, int flag)
 	if (flag) {
 	    printf("    ");
 	    for (k = 0; k < phase_cbms[phase][chunk][stats[i].id].nrules; k++) {
-		printf("%d  ", phase_cbms[phase][chunk][stats[i].id].rules[k]);
+		printf("%u  ", phase_cbms[phase][chunk][stats[i].id].rules[k]);
 	    }
 	    printf("\n");
 	}
@@ -757,8 +760,9 @@ void construct_rfc()
 // packet classification for packet[flow_id] in the flow trace
 int flow_rfc(int flow_id)
 {
-    int	    tid[MAXCHUNKS], cbm[MAXCHUNKS], chunk, rule;
-    int	    **p;
+    int		tid[MAXCHUNKS], cbm[MAXCHUNKS], chunk;
+    uint16_t	rule;
+    int		**p;
 
     // phase 0 table accesses
     p = phase_tables[0];
@@ -801,7 +805,7 @@ int flow_rfc(int flow_id)
     if (phase_cbms[3][0][cbm[0]].nrules > 0)
 	rule = phase_cbms[3][0][cbm[0]].rules[0];
     else
-	rule = -1;
+	rule = numrules;
 
     return rule;
 }
@@ -815,7 +819,7 @@ int run_rfc()
     for (i = 0; i < num_flows; i++) {
 	rule = flow_rfc(i);
 	if (rule != flows[i].match_rule) {
-	    printf("Wrong match on flow[%d]: %d != %d\n", i, rule, flows[i].match_rule);
+	    printf("Wrong match on flow[%d]: %u != %u\n", i, rule, flows[i].match_rule);
 	    dump_one_flow(i);
 	}
     }

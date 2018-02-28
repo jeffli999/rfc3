@@ -6,9 +6,8 @@
 
 const int	hash_tab_sizes[FIELDS] = {1999, 1999, 37, 359, 359};
 
-extern pc_rule_t *ruleset;	
-extern int	numrules;
-extern FILE	*fpt;       
+extern pc_rule_t    *ruleset;	
+extern uint16_t	    numrules;
 
 // end points for each field, note only field[0] has end points for the whole ruleset, and subsequent fields
 // only maintain end points for a subset of rules covering specific end points from previous fields
@@ -18,8 +17,8 @@ unsigned int	epoints[FIELDS][MAXRULES*2];
 int		num_epoints[FIELDS];		    
 
 // the subset of rules covering the specific end points at each field
-int		field_rules[FIELDS+1][MAXRULES];    
-int		num_field_rules[FIELDS+1];
+uint16_t	field_rules[FIELDS+1][MAXRULES];    
+uint16_t	num_field_rules[FIELDS+1];
 
 // hash tables for looking up existing end points to prevent duplicate end points collected
 unsigned int	**epoint_hash[FIELDS];
@@ -124,7 +123,7 @@ void sort_epoints(int field)
 // only used for field[0] (SIP), which needs all rules to generate its end points
 void collect_all_rules(int field)
 {
-    int	    i;
+    uint16_t	i;
     for (i = 0; i < numrules; i++)
 	field_rules[field][i] = i;
     num_field_rules[field] = numrules;
@@ -133,10 +132,11 @@ void collect_all_rules(int field)
 
 
 // generate end points on field f for a subset of rules (passed from previous field processing)
-void gen_field_epoints(int f, int *rules, int nrules)
+void gen_field_epoints(int f, uint16_t *rules, uint16_t nrules)
 {
     unsigned int    *p = epoints[f], point;
-    int		    i, r, hit, n = 0;
+    uint16_t	    i, r;
+    int		    hit;
 
     reset_epoint_hash(f);
     num_epoints[f] = 0;
@@ -159,7 +159,8 @@ void gen_field_epoints(int f, int *rules, int nrules)
 // collect a subset of field_rules[field] covering an end point on field f
 void collect_field_epoint_rules(int f, unsigned int point)
 {
-    int	    i, r, low, high;
+    uint16_t	i, r;
+    int		low, high;
 
     num_field_rules[f+1] = 0;
     for (i = 0; i < num_field_rules[f]; i++) {
@@ -177,7 +178,7 @@ void collect_field_epoint_rules(int f, unsigned int point)
 // 2) the stack of end points from field[0] ~ field[FIELDS-1]
 int create_one_flow()
 {
-    int	    i;
+    uint16_t	i;
 
     if (num_flows == size_flows) {
 	size_flows += INITFLOWS;
@@ -189,7 +190,7 @@ int create_one_flow()
     flows[num_flows].sp = epoint_stack[3];
     flows[num_flows].dp = epoint_stack[4];
     if (num_field_rules[FIELDS] == 0)
-	flows[num_flows].match_rule = -1;
+	flows[num_flows].match_rule = numrules;
     else
 	flows[num_flows].match_rule = field_rules[FIELDS][0];
     /*
@@ -335,7 +336,7 @@ void dump_one_flow(int i)
     printf("%d ", flows[i].proto);
     printf("%d ", flows[i].sp);
     printf("%d ", flows[i].dp);
-    printf(": rule[%d]\n", flows[i].match_rule);
+    printf(": rule[%u]\n", flows[i].match_rule);
 }
 
 

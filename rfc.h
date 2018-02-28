@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #define MAXRULES	65536
 #define FIELDS		5
 #define MAXCHUNKS	7
@@ -13,15 +15,11 @@ typedef struct pc_rule {
 } pc_rule_t;
 
 typedef struct cbm_entry {
-    int	id;
-    int nrules;
-    int *rules;
-    int rulesum;
+    int		id;
+    int		rulesum;
+    uint16_t	nrules;
+    uint16_t	*rules;
 } cbm_t;
-
-typedef struct eq_entry {
-    int	eq_id;
-} eq_t;
 
 typedef struct cbm_stat {
     int	id;
