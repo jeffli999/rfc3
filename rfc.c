@@ -16,21 +16,31 @@
 #include <string.h>
 #include <time.h>
 #include "rfc.h"
+#include "flow.h"
 
 const int chunk_to_field[MAXCHUNKS] = {0, 0, 1, 1, 2, 3, 4};
 const int shamt[MAXCHUNKS] = {0, 16, 0, 16, 0, 0, 0};
 
-int  phase = 4;  // number of phases
-FILE *fpr;       // ruleset file
-FILE *fpt;       // test trace file
+extern flow_entry_t *flows;
+extern int	    num_flows;	// current number of flows
 
-int	numrules=0;  // actual number of rules in rule set
-struct pc_rule *ruleset; 
+FILE	*fpr;		// ruleset file
+FILE	*fpt;		// test packet trace file
 
+int	    numrules;	// actual number of rules in rule set
+pc_rule_t   *ruleset;	// the rule set for packet classification
+
+// functions to be performed by this program, which are specified in command-line parameters
+int	func_write_flow, func_read_flow, func_check_classify;
+
+// end points for each chunk in phase 0, used for generating CBMs in phase 0
 int	epoints[MAXCHUNKS][MAXRULES*2+2];
 int	num_epoints[MAXCHUNKS];
+
+// CBMs for each chunk at each phase
 cbm_t	*phase_cbms[PHASES][MAXCHUNKS];
 int	phase_num_cbms[PHASES][MAXCHUNKS];
+// phase tables contaiting CBM ids for each chunk at each phase
 int	*phase_tables[PHASES][MAXCHUNKS];
 int	phase_table_sizes[PHASES][MAXCHUNKS];
 
@@ -40,11 +50,12 @@ int	rules_len_count[MAXRULES+1];
 // To speed up, we can limit its search to CBMs with the same rulesum
 // A hash table hashing on CBM's rulesum is introduced for this purpose
 //#define HASH_TAB_SIZE   9209
-#define HASH_TAB_SIZE   29123
+#define HASH_TAB_SIZE   99787
 int     *cbm_hash[HASH_TAB_SIZE];
 int     cbm_hash_size[HASH_TAB_SIZE];   
 int     cbm_hash_num[HASH_TAB_SIZE];    
 
+// data structures for examining the two bottleneck functions, cmb_lookup(), cbm_2intersect()
 long	hash_stats[10000];
 long	intersect_stats[MAXRULES*2];
 
@@ -52,6 +63,7 @@ long	intersect_stats[MAXRULES*2];
 int do_cbm_stats(int phase, int chunk, int flag);
 
 
+// statistics on the total number of rule comparisons in cbm_2intersect(), which is the primary bottleneck
 void dump_intersect_stats()
 {
     int	    i;
@@ -119,19 +131,21 @@ void parseargs(int argc, char *argv[])
     int	c;
     int ok = 1;
 
-    while ((c = getopt(argc, argv, "p:r:t:h")) != -1) {
+    while ((c = getopt(argc, argv, "r:t:w:h")) != -1) {
 	switch (c) {
-	    case 'p':
-		phase = atoi(optarg);
+	    case 'w':
+		fpt = fopen(optarg, "w");
+		func_write_flow = 1;
 		break;
 	    case 'r':
 		fpr = fopen(optarg, "r");
 		break;
 	    case 't':
 		fpt = fopen(optarg, "r");
+		func_read_flow = 1;
 		break;
 	    case 'h':
-		printf("rfc [-p phase][-r ruleset][-t trace][-h]\n");
+		printf("rfc [-w trace-to-write][-r ruleset][-t trace-to-read][-h]\n");
 		exit(1);
 		break;
 	    default:
@@ -139,16 +153,16 @@ void parseargs(int argc, char *argv[])
 	}
     }
 
-    if(phase < 3 || phase > 4) {
-	printf("number of phases should be either 3 or 4\n");
-	ok = 0;
-    }	
     if(fpr == NULL) {
 	printf("can't open ruleset file\n");
 	ok = 0;
     }
+    if((fpt == NULL) && (func_write_flow || func_read_flow)){
+	printf("can't open flow trace file\n");
+	ok = 0;
+    }
     if (!ok || optind < argc) {
-	fprintf (stderr, "rfc [-p phase][-r ruleset][-t trace][-h]\n");
+	fprintf(stderr, "rfc [-w trace-to-write][-r ruleset][-t trace-to-read][-h]\n");
 	exit(1);
     }
 }
@@ -267,6 +281,7 @@ int sort_endpoints()
 }
 
 
+// the first step for rfc is to generate end points on each field chunk
 int gen_endpoints()
 {
     int	    i, f, k, chunk;
@@ -285,6 +300,7 @@ int gen_endpoints()
 }
 
 
+// check whether two rulelists are the same
 int compare_rules(int *rules1, int *rules2, int n)
 {
     int	    i;
@@ -297,6 +313,8 @@ int compare_rules(int *rules1, int *rules2, int n)
 }
 
 
+// given a rulelist, check whether it is already in the given set of CBMs,
+// return the hit CBM id if there is a match, otherwise return -1
 int cbm_lookup(int *rules, int nrules, int rulesum, cbm_t *cbm_set)
 {
     int	    h, i, n, id, match = 0;
@@ -339,6 +357,7 @@ void dump_phase_table(int *table, int len, int thresh_rlen)
 }
 
 
+// a new CBM is added into the hash table to prevent duplicate CBMs added into the CBM set in the future
 void add_to_hash(cbm_t *cbm)
 {
     int	    h;
@@ -352,7 +371,8 @@ void add_to_hash(cbm_t *cbm)
 }
 
 
-int get_epoint_rules(int chunk, int point, int *rules, int *rulesum)
+// given an end point on a chunk, collect rules covering it
+int collect_epoint_rules(int chunk, int point, int *rules, int *rulesum)
 {
     int	    nrules = 0, i, f, k, low, high;
 
@@ -371,6 +391,20 @@ int get_epoint_rules(int chunk, int point, int *rules, int *rulesum)
 }
 
 
+// dump out the rulelist of the CBM
+void dump_cbm_rules(cbm_t *cbm)
+{
+    int	    i;
+
+    printf("cbm[%d]: ", cbm->id);
+    for (i = 0; i < cbm->nrules; i++)
+	printf("%d ", cbm->rules[i]);
+    printf("\n");
+}
+
+
+// if the rulelist is not in the CBM set of current <phase, chunk>, create a new CBM with this rulelist,
+// and add it into the CBM set of current < phase, chunk> (i.e., phase_cbms[phase][chunk])
 int create_cbm(int phase, int chunk, int *rules, int nrules, int rulesum)
 {
     static int	cbm_sizes[PHASES][MAXCHUNKS];
@@ -397,6 +431,8 @@ int create_cbm(int phase, int chunk, int *rules, int nrules, int rulesum)
 }
 
 
+// phase 0: generate CBMs for a chunk in phase 0, and populate the corresponding phase table with
+// the corresponding CBM ids
 void gen_p0_cbm(int chunk)
 {
     int		rules[MAXRULES], nrules, rulesum, next_point, cbm_id, i, j, table_size = 65536;
@@ -406,7 +442,7 @@ void gen_p0_cbm(int chunk)
     init_cbm_hash();
     for (i = 0; i < num_epoints[chunk]; i++) {
 	// 1. generate a cbm
-	nrules = get_epoint_rules(chunk, epoints[chunk][i], rules, &rulesum);
+	nrules = collect_epoint_rules(chunk, epoints[chunk][i], rules, &rulesum);
 
 	// 2. check whether the generated cbm exists
 	cbm_id = cbm_lookup(rules, nrules, rulesum, phase_cbms[0][chunk]);
@@ -425,6 +461,7 @@ void gen_p0_cbm(int chunk)
 }
 
 
+// phase 0: generate phase tables for phase 0
 int gen_p0_tables()
 {
     int		chunk;
@@ -438,6 +475,7 @@ int gen_p0_tables()
 }
 
 
+// intersecting the rulelists of two CBMs (each from current CBMs for constructing a CBM set in next phase)
 int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *rules, int *rulesum)
 {
     int	    i = 0, j = 0, n = 0, ncmp = 0;
@@ -460,6 +498,8 @@ int cbm_2intersect(cbm_t *c1, cbm_t *c2, int *rules, int *rulesum)
 }
 
 
+// crossproducting two chunks using their CBM sets for a chunk in the next phase,
+// and populate the corresponding phase table in next phase with the generated CBM set
 void crossprod_2chunk(int phase, int chunk, cbm_t *cbms1, int n1, cbm_t *cbms2, int n2)
 {
     int	    i, j, len, cbm_id, cpd_size = n1 * n2;
@@ -535,6 +575,9 @@ int do_cbm_stats(int phase, int chunk, int flag)
 }
 
 
+// do phase 1 crossproducting for three pairs of chunks in phase 0,
+// Alert 1: the protocol chunk is left for crossproducting in next phase
+// Alert 2: be careful of the order of crosspoducting for each pair of chunks (as commented in below code)
 int p1_crossprod()
 {
     int	    table_size, n1, n2;
@@ -581,6 +624,9 @@ int p1_crossprod()
 }
 
 
+// do phase 2 crossproducting for two pairs of chunks,
+// Alert: three chunks (SIP, DIP, Ports) are from phase 1, and one chunk (protocol field) from phase 0.
+// Alert: pay attention of their orders in crossproducting
 int p2_crossprod()
 {
     int	    table_size, n1, n2;
@@ -602,7 +648,7 @@ int p2_crossprod()
     n1 = phase_num_cbms[0][4];
     n2 = phase_num_cbms[1][2];
     table_size = n1 * n2;
-    cbms1 = phase_cbms[0][4];
+    cbms1 = phase_cbms[0][4];	// Alert: unlike the other 3 chunks, this chunk is an orphant from phase 0
     cbms2 = phase_cbms[1][2];
     phase_table_sizes[2][1] = table_size;
     phase_tables[2][1] = (int *) malloc(table_size*sizeof(int));
@@ -615,6 +661,7 @@ int p2_crossprod()
 }
 
 
+// do crossproducting for two pairs of chunks for the last phase
 int p3_crossprod()
 {
     int	    table_size, n1, n2;
@@ -636,6 +683,7 @@ int p3_crossprod()
 }
 
 
+// statistics on the sizes of CBM sets and phase tables
 int do_rfc_stats()
 {
     int	    i, phase_total[4] = {0, 0, 0, 0}, total = 0;
@@ -675,35 +723,11 @@ int do_rfc_stats()
 }
 
 
-int main(int argc, char* argv[]){
-
-    int i,j,k;
-    unsigned a, b, c, d, e, f, g;
-    int header[FIELDS];
-    char *s = (char *)calloc(200, sizeof(char));
-    int done;
-    int fid;
-    int size = 0;
-    int access = 0;
-    int tmp;
+// constructing the RFC tables with a 3-phase process
+void construct_rfc()
+{
     clock_t t;
 
-    parseargs(argc, argv);
-
-    while(fgets(s, 200, fpr) != NULL)numrules++;
-    rewind(fpr);
-
-    free(s);
-
-    ruleset = (pc_rule_t *) calloc(numrules, sizeof(pc_rule_t));
-    numrules = loadrule(fpr, ruleset);
-
-    printf("Number of rules: %d\n\n", numrules);
-
-    create_flows();
-    write_flow_trace("flows.trc");
-
-    /*
     gen_endpoints();
     dump_endpoints();
 
@@ -727,6 +751,111 @@ int main(int argc, char* argv[]){
     //dump_hash_stats();
 
     printf("\n");
-    */
+}
 
+
+// packet classification for packet[flow_id] in the flow trace
+int flow_rfc(int flow_id)
+{
+    int	    tid[MAXCHUNKS], cbm[MAXCHUNKS], chunk, rule;
+    int	    **p;
+
+    // phase 0 table accesses
+    p = phase_tables[0];
+    tid[0] = flows[flow_id].sip >> shamt[0] & 0xFFFF;
+    tid[1] = flows[flow_id].sip >> shamt[1] & 0xFFFF;
+    tid[2] = flows[flow_id].dip >> shamt[2] & 0xFFFF;
+    tid[3] = flows[flow_id].dip >> shamt[3] & 0xFFFF;
+    tid[4] = flows[flow_id].proto >> shamt[4] & 0xFFFF;
+    tid[5] = flows[flow_id].sp >> shamt[5] & 0xFFFF;
+    tid[6] = flows[flow_id].dp >> shamt[6] & 0xFFFF;
+    for (chunk = 0; chunk < MAXCHUNKS; chunk++) {
+	cbm[chunk] = p[chunk][tid[chunk]];
+	//dump_cbm_rules(&phase_cbms[0][chunk][cbm[chunk]]);
+    }
+
+    // phase 1 table accesses
+    p = phase_tables[1];
+    tid[0] = cbm[1] * phase_num_cbms[0][0] + cbm[0];
+    tid[1] = cbm[3] * phase_num_cbms[0][2] + cbm[2];
+    tid[2] = tid[4];
+    tid[3] = cbm[6] * phase_num_cbms[0][5] + cbm[5];
+    cbm[0] = p[0][tid[0]];
+    cbm[1] = p[1][tid[1]];
+    cbm[2] = cbm[4];
+    cbm[3] = p[2][tid[3]];
+
+    // phase 2 table accesses
+    p = phase_tables[2];
+    tid[0] = cbm[0] * phase_num_cbms[1][1] + cbm[1];
+    tid[1] = cbm[2] * phase_num_cbms[1][2] + cbm[3];
+    cbm[0] = p[0][tid[0]];
+    cbm[1] = p[1][tid[1]];
+
+
+    // phase 3 table accesses
+    p = phase_tables[3];
+    tid[0] = cbm[0] * phase_num_cbms[2][1] + cbm[1];
+    cbm[0] = p[0][tid[0]];
+
+    if (phase_cbms[3][0][cbm[0]].nrules > 0)
+	rule = phase_cbms[3][0][cbm[0]].rules[0];
+    else
+	rule = -1;
+
+    return rule;
+}
+
+
+// packet classifcation with a packet flow trace to check correctness of the rfc tables constructed
+int run_rfc()
+{
+    int	    rule, i;
+
+    for (i = 0; i < num_flows; i++) {
+	rule = flow_rfc(i);
+	if (rule != flows[i].match_rule) {
+	    printf("Wrong match on flow[%d]: %d != %d\n", i, rule, flows[i].match_rule);
+	    dump_one_flow(i);
+	}
+    }
+}
+
+
+int main(int argc, char* argv[])
+{
+    char *s = (char *)calloc(200, sizeof(char));
+
+    parseargs(argc, argv);
+
+    while(fgets(s, 200, fpr) != NULL) numrules++;
+    rewind(fpr);
+
+    free(s);
+
+    // read rules
+    ruleset = (pc_rule_t *) calloc(numrules, sizeof(pc_rule_t));
+    numrules = loadrule(fpr, ruleset);
+    printf("Number of rules: %d\n\n", numrules);
+
+    if (func_read_flow) {
+	// read in a flow trace for checking the correctness of the RFC constructed
+	read_flow_trace(fpt);
+	//dump_flows();
+    }
+
+    if (func_write_flow) {
+	// generate a flow trace (used for checking the correctness of RFC packet classification)
+	create_flows();
+	write_flow_trace(fpt);
+	fclose(fpt);
+	return 1;   // aim to produce trace, no need for packet classification
+    }
+
+    // constructing RFC tables
+    construct_rfc();
+
+    // check the correctness of RFC packet classification if a flow trace is provided
+    if (func_read_flow)
+	run_rfc();
 }  

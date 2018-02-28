@@ -1,5 +1,5 @@
-#define	    MAXFLOWS	3000000
-#define	    INITFLOWS	 100000
+#define	    MAXFLOWS	20000000
+#define	    INITFLOWS	 1000000
 
 typedef struct flow_entry {
     unsigned int    sip, dip;
@@ -9,5 +9,7 @@ typedef struct flow_entry {
 } flow_entry_t;
 
 void create_flows();
-void write_flow_trace(char *trace_name);
-void dump_flow_trace();
+void write_flow_trace(FILE *ftrace);
+void read_flow_trace(FILE *ftrace);
+void dump_one_flow(int i);
+void dump_flows();
